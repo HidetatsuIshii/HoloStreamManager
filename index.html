@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Holo-Stream Manager (Alpha)</title>
+    <style>
+        :root {
+            --bg-color: #0f0f0f;
+            --panel-color: #1e1e1e;
+            --accent-color: #00aaff;
+            --text-color: #ffffff;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            overflow: hidden;
+        }
+
+        /* コントロールパネル */
+        #controls {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 60px;
+            background: var(--panel-color);
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            z-index: 100;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        }
+
+        #url-input {
+            flex-grow: 1;
+            background: #2b2b2b;
+            border: 1px solid #444;
+            color: white;
+            padding: 8px;
+            margin-right: 10px;
+            border-radius: 4px;
+        }
+
+        button {
+            background: var(--accent-color);
+            border: none;
+            color: white;
+            padding: 8px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        button:hover { opacity: 0.8; }
+
+        /* 動画コンテナのグリッド */
+        #stream-container {
+            position: absolute;
+            top: 60px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: grid;
+            gap: 4px;
+            padding: 4px;
+        }
+
+        .video-wrapper {
+            position: relative;
+            background: #000;
+            overflow: hidden;
+        }
+
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        /* コメントオーバーレイ層 */
+        .comment-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* 下の動画をクリック可能に */
+            z-index: 10;
+        }
+
+        .danmaku {
+            position: absolute;
+            white-space: nowrap;
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 2px 2px 2px #000, -1px -1px 0 #000;
+            will-change: transform;
+        }
+    </style>
+</head>
+<body>
+
+<div id="controls">
+    <input type="text" id="url-input" placeholder="YouTube URLをスペース区切りで入力（例: https://www.youtube.com/watch?v=ID1 ...）">
+    <button onclick="updateStreams()">反映</button>
+</div>
+
+<div id="stream-container"></div>
+
+<script>
+    // YouTube IDを抽出する関数
+    function getYouTubeId(url) {
+        const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+        const match = url.match(regExp);
+        return (match && match[2].length === 11) ? match[2] : null;
+    }
+
+    function updateStreams() {
+        const input = document.getElementById('url-input').value;
+        const container = document.getElementById('stream-container');
+        container.innerHTML = ''; // クリア
+
+        const urls = input.split(/\s+/).filter(url => url.trim() !== "");
+        const ids = urls.map(url => getYouTubeId(url)).filter(id => id !== null);
+
+        // グリッドレイアウトの計算
+        let cols = Math.ceil(Math.sqrt(ids.length));
+        let rows = Math.ceil(ids.length / cols);
+        container.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+        container.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+
+        ids.forEach(id => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'video-wrapper';
+            
+            // iframe作成
+            const iframe = document.createElement('iframe');
+            iframe.src = `https://www.youtube.com/embed/${id}?autoplay=1&mute=1`;
+            iframe.allow = "autoplay; encrypted-media";
+            
+            // コメント層作成
+            const overlay = document.createElement('div');
+            overlay.className = 'comment-overlay';
+            
+            wrapper.appendChild(iframe);
+            wrapper.appendChild(overlay);
+            container.appendChild(wrapper);
+
+            // ダミーコメント生成開始（テスト用）
+            startDummyComments(overlay);
+        });
+    }
+
+    // ニコニコ風コメントを流すロジック
+    function createComment(container, text) {
+        const el = document.createElement('div');
+        el.className = 'danmaku';
+        el.innerText = text;
+        
+        // ランダムな高さに配置
+        const top = Math.random() * 80; 
+        el.style.top = `${top}%`;
+        el.style.left = '100%';
+        
+        container.appendChild(el);
+
+        // アニメーション設定
+        const duration = 4000 + Math.random() * 3000; // 4〜7秒
+        const startTime = performance.now();
+        const width = el.offsetWidth || 200; // 推定幅
+
+        function step(timestamp) {
+            const progress = (timestamp - startTime) / duration;
+            const x = -((window.innerWidth + width) * progress);
+            el.style.transform = `translateX(${x}px)`;
+
+            if (progress < 1) {
+                requestAnimationFrame(step);
+            } else {
+                el.remove();
+            }
+        }
+        requestAnimationFrame(step);
+    }
+
+    // テスト用の自動コメント生成
+    function startDummyComments(container) {
+        const sampleTexts = ["草", "かわいいｗ", "たすかる", "！？", "8888888", "こんこよー！", "ナイスパ！"];
+        setInterval(() => {
+            if (Math.random() > 0.7) {
+                createComment(container, sampleTexts[Math.floor(Math.random() * sampleTexts.length)]);
+            }
+        }, 1000);
+    }
+</script>
+
+</body>
+</html>
