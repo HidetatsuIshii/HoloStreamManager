@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>HoloStreamer Pro - Dynamic Layout</title>
+    <title>HoloStreamer Pro - Dynamic Layout & Live Chat</title>
     <style>
         :root {
             --bg-dark: #000000;
@@ -56,7 +56,7 @@
         #video-grid {
             width: 100%; height: 100%;
             display: grid;
-            gap: 2px; /* 隙間を最小限に */
+            gap: 2px;
             background: #000;
         }
 
@@ -74,7 +74,7 @@
         }
         .comment-text {
             position: absolute; white-space: nowrap; font-weight: bold;
-            color: white; text-shadow: 1px 1px 2px #000, -1px -1px 0 #000;
+            color: white; text-shadow: 2px 2px 2px #000, -1px -1px 0 #000;
             pointer-events: none; will-change: transform;
         }
 
@@ -89,7 +89,7 @@
 
 <div id="sidebar">
     <div class="sidebar-content">
-        <h2>Settings</h2>
+        <h2>HoloStreamer Pro</h2>
         <textarea id="url-list" placeholder="YouTube URLを入力..."></textarea>
         <p class="hint">マウスを左端に寄せると表示されます</p>
         <button onclick="applyStreams()">適用して全画面表示</button>
@@ -107,86 +107,9 @@
 
 <script>
     // --- 設定値 ---
-    const FETCH_INTERVAL = 3000; // 3秒ごとに新着チェック
-    const PROXY_URL = "https://api.allorigins.win/get?url="; // CORS回避用プロキシ
-    
-    // 取得済みのコメントIDを記録（重複防止）
+    const FETCH_INTERVAL = 5000; // 5秒ごとに新着チェック（負荷軽減のため少し延長）
+    const PROXY_URL = "https://api.allorigins.win/get?url="; 
     let processedMessageIds = new Set();
-    
-    async function applyStreams() {
-        const text = document.getElementById('url-list').value;
-        const ids = text.split(/\s+/).map(getYouTubeId).filter(id => id);
-        const grid = document.getElementById('video-grid');
-        grid.innerHTML = '';
-    
-        if (ids.length === 0) return;
-    
-        // レイアウト計算（前回同様）
-        setupLayout(ids.length);
-    
-        ids.forEach(id => {
-            const container = document.createElement('div');
-            container.className = 'video-container';
-            container.dataset.videoId = id; // IDを保持
-            
-            const iframe = document.createElement('iframe');
-            iframe.src = `https://www.youtube.com/embed/${id}?autoplay=1&mute=1`;
-            
-            const overlay = document.createElement('div');
-            overlay.className = 'comment-canvas';
-            
-            container.appendChild(iframe);
-            container.appendChild(overlay);
-            grid.appendChild(container);
-    
-            // 各動画に対してチャット取得ループを開始
-            startChatPoller(id, overlay);
-        });
-    }
-    
-    // チャットを定期的に監視する関数
-    async function startChatPoller(videoId, overlay) {
-        const chatUrl = encodeURIComponent(`https://www.youtube.com/live_chat?v=${videoId}`);
-        
-        const poll = async () => {
-            try {
-                // プロキシ経由でYouTubeチャットHTMLを取得
-                const response = await fetch(`${PROXY_URL}${chatUrl}`);
-                const data = await response.json();
-                const htmlString = data.contents;
-    
-                // 文字列をDOMとして解析
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(htmlString, 'text/html');
-                
-                // YouTubeのチャット要素（スクリプト内のJSONデータなどを探す）
-                // ※埋め込み型HTMLの場合、初期表示のコメントは特定のセレクタで取得可能
-                const messages = doc.querySelectorAll('.yt-live-chat-text-message-renderer');
-                
-                messages.forEach(msg => {
-                    const author = msg.querySelector('#author-name')?.innerText || "Guest";
-                    const text = msg.querySelector('#message')?.innerText || "";
-                    const msgId = msg.getAttribute('id');
-    
-                    if (text && !processedMessageIds.has(msgId)) {
-                        processedMessageIds.add(msgId);
-                        createComment(overlay, `${author}: ${text}`);
-                    }
-                });
-    
-                // メモリ節約のため古いIDを削除
-                if (processedMessageIds.size > 500) processedMessageIds.clear();
-    
-            } catch (e) {
-                console.error("Chat fetch error:", e);
-            }
-            
-            // 次の実行をスケジュール
-            setTimeout(poll, FETCH_INTERVAL);
-        };
-    
-        poll();
-    }
     let hideTimer;
 
     // サイドバーの自動隠蔽ロジック
@@ -196,7 +119,7 @@
         clearTimeout(hideTimer);
         hideTimer = setTimeout(() => {
             sidebar.classList.remove('active');
-        }, 3000); // 3秒間操作がないと隠す
+        }, 3000);
     });
 
     function getYouTubeId(url) {
@@ -205,24 +128,17 @@
         return m ? m[1] : null;
     }
 
-    function applyStreams() {
-        const text = document.getElementById('url-list').value;
-        const ids = text.split(/\s+/).map(getYouTubeId).filter(id => id);
+    // 配信数に応じたレイアウト設定
+    function setupLayout(count) {
         const grid = document.getElementById('video-grid');
-        grid.innerHTML = '';
-
-        if (ids.length === 0) return;
-
-        // 配信数に応じた最適レイアウト
-        const count = ids.length;
         let cols, rows;
 
         if (count === 1) {
             cols = 1; rows = 1;
         } else if (count === 2) {
-            cols = 2; rows = 1; // 左右分割
+            cols = 2; rows = 1;
         } else if (count <= 4) {
-            cols = 2; rows = 2; // 田の字
+            cols = 2; rows = 2;
         } else if (count <= 6) {
             cols = 3; rows = 2;
         } else {
@@ -232,6 +148,17 @@
 
         grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
         grid.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+    }
+
+    async function applyStreams() {
+        const text = document.getElementById('url-list').value;
+        const ids = text.split(/\s+/).map(getYouTubeId).filter(id => id);
+        const grid = document.getElementById('video-grid');
+        grid.innerHTML = '';
+
+        if (ids.length === 0) return;
+
+        setupLayout(ids.length);
 
         ids.forEach(id => {
             const container = document.createElement('div');
@@ -247,11 +174,46 @@
             container.appendChild(overlay);
             grid.appendChild(container);
 
-            startDummyComments(overlay);
+            // リアルチャット取得開始
+            startChatPoller(id, overlay);
         });
 
-        // 適用したらメニューを即座に隠す
         sidebar.classList.remove('active');
+    }
+
+    async function startChatPoller(videoId, overlay) {
+        const chatUrl = encodeURIComponent(`https://www.youtube.com/live_chat?v=${videoId}`);
+        
+        const poll = async () => {
+            try {
+                const response = await fetch(`${PROXY_URL}${chatUrl}`);
+                const data = await response.json();
+                const htmlString = data.contents;
+
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(htmlString, 'text/html');
+                
+                // YouTubeのHTML構造に合わせたセレクタ（暫定）
+                const messages = doc.querySelectorAll('yt-live-chat-text-message-renderer');
+                
+                messages.forEach(msg => {
+                    const author = msg.querySelector('#author-name')?.innerText || "";
+                    const text = msg.querySelector('#message')?.innerText || "";
+                    const msgId = msg.getAttribute('id');
+
+                    if (text && !processedMessageIds.has(msgId)) {
+                        processedMessageIds.add(msgId);
+                        createComment(overlay, `${author}: ${text}`);
+                    }
+                });
+
+                if (processedMessageIds.size > 500) processedMessageIds.clear();
+            } catch (e) {
+                console.error("Chat fetch error:", e);
+            }
+            setTimeout(poll, FETCH_INTERVAL);
+        };
+        poll();
     }
 
     function createComment(container, text) {
@@ -264,13 +226,12 @@
         el.style.left = '100%';
         container.appendChild(el);
 
-        const duration = 5000 + Math.random() * 3000;
+        const duration = 6000 + Math.random() * 3000;
         const startTime = performance.now();
 
         function animate(time) {
             const progress = (time - startTime) / duration;
-            // 画面外（-150%程度）まで流す
-            el.style.transform = `translateX(-${(100 + 200) * progress}vw)`;
+            el.style.transform = `translateX(-${(100 + 150) * progress}vw)`;
 
             if (progress < 1) {
                 requestAnimationFrame(animate);
@@ -279,15 +240,6 @@
             }
         }
         requestAnimationFrame(animate);
-    }
-
-    function startDummyComments(container) {
-        const words = ["草", "w", "かわいい", "！？", "きたああ", "88888", "たすかる"];
-        const loop = () => {
-            if (Math.random() > 0.5) createComment(container, words[Math.floor(Math.random() * words.length)]);
-            setTimeout(loop, 1000 + Math.random() * 2000);
-        };
-        loop();
     }
 </script>
 
