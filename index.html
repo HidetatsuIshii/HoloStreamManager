@@ -2,249 +2,137 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>HoloStreamer Pro - Multi-View Manager</title>
+    <title>監視ビューア</title>
     <style>
-        :root {
-            --bg-dark: #050505;
-            --panel-bg: #121212;
-            --accent: #00d4ff;
-            --text: #e0e0e0;
-        }
-
         body, html {
-            margin: 0; padding: 0; width: 100%; height: 100%;
-            background: var(--bg-dark); color: var(--text);
-            font-family: 'Segoe UI', sans-serif; overflow: hidden;
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+            font-family: sans-serif;
+            background-color: #f3f3f3;
+        }
+
+        /* 全体コンテナ */
+        #app-container {
             display: flex;
+            width: 100vw;
+            height: 100vh;
+            position: relative;
         }
 
-        /* サイドバー設定パネル */
-        #sidebar {
-            width: 300px;
-            background: var(--panel-bg);
-            border-right: 1px solid #333;
+        /* サイドメニュー：初期状態 */
+        #side-menu {
+            width: 250px;
+            height: 100%;
+            background-color: #232f3e;
+            color: white;
+            transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            position: absolute;
+            left: 0;
+            top: 0;
+            z-index: 1000;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        /* メニューが隠れた状態 */
+        #side-menu.hidden {
+            transform: translateX(-100%);
+        }
+
+        /* メイン配信エリア：メニューの有無に合わせて自動で広がる */
+        #view-area {
+            flex-grow: 1;
+            height: 100%;
             display: flex;
-            flex-direction: column;
-            transition: transform 0.3s ease;
-            z-index: 200;
+            justify-content: center;
+            align-items: center;
+            transition: padding-left 0.5s ease;
+            width: 100%;
         }
 
-        .sidebar-content { padding: 20px; flex-grow: 1; overflow-y: auto; }
-        h2 { font-size: 1.2rem; margin-bottom: 20px; color: var(--accent); border-bottom: 2px solid var(--accent); padding-bottom: 5px; }
-
-        textarea {
-            width: 100%; height: 150px;
-            background: #1e1e1e; color: #fff; border: 1px solid #444;
-            border-radius: 4px; padding: 10px; box-sizing: border-box;
-            font-family: monospace; resize: none; margin-bottom: 15px;
+        /* 配信アイテム（ログイン画面など）のコンテナ */
+        .stream-item {
+            width: 100%;
+            height: 100%;
+            max-width: 100%; /* 1つの時に画面いっぱいに広がる */
+            max-height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: white;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
         }
 
-        .control-group { margin-bottom: 20px; border-top: 1px solid #333; padding-top: 15px; }
-        label { display: block; font-size: 0.8rem; margin-bottom: 5px; opacity: 0.8; }
-        input[type="range"] { width: 100%; margin-bottom: 10px; }
-
-        button {
-            width: 100%; padding: 12px; background: var(--accent); border: none;
-            color: #000; font-weight: bold; border-radius: 4px; cursor: pointer;
-            transition: 0.2s; margin-bottom: 10px;
-        }
-        button:hover { filter: brightness(1.2); }
-        button.secondary { background: #333; color: #fff; }
-
-        /* メイン視聴エリア */
-        #main-view { flex-grow: 1; position: relative; display: flex; flex-direction: column; }
-        
-        #video-grid {
-            flex-grow: 1; display: grid; gap: 8px; padding: 8px;
-            background: #000; align-content: center;
-        }
-
-        .video-container {
-            position: relative; background: #111; border: 2px solid transparent;
-            transition: border 0.2s; border-radius: 8px; overflow: hidden;
-        }
-        .video-container.active { border-color: var(--accent); box-shadow: 0 0 15px rgba(0, 212, 255, 0.4); }
-
-        iframe { width: 100%; height: 100%; border: none; pointer-events: auto; }
-
-        /* コメントオーバーレイ */
-        .comment-canvas {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none; z-index: 100;
-        }
-        .comment-text {
-            position: absolute; white-space: nowrap; font-weight: 900;
-            color: white; text-shadow: 2px 2px 2px #000, -1px -1px 0 #000;
-            will-change: transform; pointer-events: none;
-        }
-
-        /* ツールチップ/通知 */
-        #toast {
-            position: fixed; bottom: 20px; right: 20px; background: var(--accent);
-            color: #000; padding: 10px 20px; border-radius: 20px; font-weight: bold;
-            display: none; z-index: 1000;
+        /* 内部のAmazonログインボックス等のサイズを最大化 */
+        .auth-container {
+            width: 100%;
+            max-width: 450px; /* 1つの時でも見栄えが良い適切な最大幅 */
+            padding: 40px;
+            transform: scale(1.1); /* 迫力を出すためのスケーリング */
         }
     </style>
 </head>
-<body>
+<body onmousemove="handleUserActivity()">
 
-<div id="sidebar">
-    <div class="sidebar-content">
-        <h2>HoloStreamer Pro</h2>
-        <label>YouTube URLs (1行に1つ)</label>
-        <textarea id="url-list" placeholder="https://www.youtube.com/watch?v=..."></textarea>
-        
-        <button onclick="applyStreams()">配信を同期する</button>
-        <button class="secondary" onclick="toggleMuteAll()">全ミュート切替</button>
-
-        <div class="control-group">
-            <label>コメント不透明度</label>
-            <input type="range" id="cfg-opacity" min="0" max="1" step="0.1" value="0.8" onchange="updateStyles()">
-            <label>コメントサイズ</label>
-            <input type="range" id="cfg-size" min="12" max="48" value="28" onchange="updateStyles()">
-            <label>流れる速度</label>
-            <input type="range" id="cfg-speed" min="2" max="10" value="5" reversed>
+    <div id="app-container">
+        <div id="side-menu">
+            <h2>管理パネル</h2>
+            <p>ステータス: 監視中</p>
+            <hr>
+            <ul>
+                <li>デバイス一覧</li>
+                <li>ログ確認</li>
+                <li>設定</li>
+            </ul>
+            <p style="font-size: 0.8em; margin-top: 50px; color: #888;">
+                ※マウスを動かすと再表示されます
+            </p>
         </div>
-        
-        <div style="font-size: 0.7rem; opacity: 0.5;">
-            ※枠をクリックすると、その配信の音声を優先します。
+
+        <div id="view-area">
+            <div class="stream-item">
+                <div class="auth-container">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg" width="120" style="display:block; margin: 0 auto 20px;">
+                    <div style="border: 1px solid #ddd; border-radius: 8px; padding: 30px;">
+                        <h1 style="font-size: 24px; font-weight: 400; margin-bottom: 20px;">サインインまたはアカウントを作成</h1>
+                        <div style="width: 100%; height: 40px; background: #f0c14b; border-radius: 8px; text-align: center; line-height: 40px; cursor: pointer; font-weight: bold;">
+                            次に進む
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
-</div>
 
-<div id="main-view">
-    <div id="video-grid"></div>
-    <div id="toast"></div>
-</div>
+    <script>
+        let hideTimeout;
+        const sideMenu = document.getElementById('side-menu');
 
-<script>
-    let players = []; // 将来的にYouTube IFrame APIで制御する場合に使用
+        function handleUserActivity() {
+            // マウスが動いたらメニューを表示
+            showMenu();
 
-    // 起動時に保存されたURLを読み込み
-    window.onload = () => {
-        const saved = localStorage.getItem('holo_urls');
-        if (saved) {
-            document.getElementById('url-list').value = saved;
-            applyStreams();
+            // 既存のタイマーをリセット
+            clearTimeout(hideTimeout);
+
+            // 3秒間操作がなければ隠す
+            hideTimeout = setTimeout(() => {
+                hideMenu();
+            }, 3000);
         }
-    };
 
-    function parseIds(text) {
-        const regex = /(?:v=|\/)([0-9A-Za-z_-]{11})/;
-        return text.split('\n')
-                   .map(line => line.match(regex))
-                   .filter(match => match)
-                   .map(match => match[1]);
-    }
-
-    function applyStreams() {
-        const text = document.getElementById('url-list').value;
-        localStorage.setItem('holo_urls', text);
-        
-        const ids = parseIds(text);
-        const grid = document.getElementById('video-grid');
-        grid.innerHTML = '';
-
-        if (ids.length === 0) return;
-
-        // グリッド計算
-        const count = ids.length;
-        const cols = count > 4 ? 3 : (count > 1 ? 2 : 1);
-        grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-
-        ids.forEach((id, index) => {
-            const container = document.createElement('div');
-            container.className = 'video-container';
-            container.onclick = () => setActiveStream(container);
-
-            const iframe = document.createElement('iframe');
-            // 埋め込みURLに各種パラメータ付与
-            iframe.src = `https://www.youtube.com/embed/${id}?enablejsapi=1&autoplay=1&mute=1&rel=0`;
-            iframe.allow = "autoplay; encrypted-media";
-            
-            const overlay = document.createElement('div');
-            overlay.className = 'comment-canvas';
-            
-            container.appendChild(iframe);
-            container.appendChild(overlay);
-            grid.appendChild(container);
-
-            // コメント生成ループ開始
-            startCommentStream(overlay);
-        });
-
-        showToast(`${ids.length}個の配信を読み込みました`);
-    }
-
-    function setActiveStream(selected) {
-        document.querySelectorAll('.video-container').forEach(el => el.classList.remove('active'));
-        selected.classList.add('active');
-        showToast("音声を切り替えました（※API連携時有効）");
-        // 本来はここでPostMessageを使いiframe内のplayerをunmuteする
-    }
-
-    function startCommentStream(container) {
-        const words = ["草", "w", "かわいい", "たすかる", "888888", "！？", "ナイスパ！", "わかる", "推ししか勝たん"];
-        
-        const spawn = () => {
-            const text = words[Math.floor(Math.random() * words.length)];
-            createComment(container, text);
-            setTimeout(spawn, Math.random() * 2000 + 500);
-        };
-        spawn();
-    }
-
-    function createComment(container, text) {
-        const el = document.createElement('div');
-        el.className = 'comment-text';
-        el.innerText = text;
-        
-        const configSize = document.getElementById('cfg-size').value;
-        const configOpacity = document.getElementById('cfg-opacity').value;
-        const configSpeed = document.getElementById('cfg-speed').value;
-
-        el.style.fontSize = configSize + 'px';
-        el.style.opacity = configOpacity;
-        el.style.top = Math.random() * 85 + '%';
-        el.style.left = '100%';
-        
-        container.appendChild(el);
-
-        const duration = (12 - configSpeed) * 1000; 
-        const startTime = performance.now();
-        const width = text.length * configSize; // およその幅
-
-        function animate(time) {
-            const elapsed = time - startTime;
-            const progress = elapsed / duration;
-            const x = -((window.innerWidth / 2 + width + 500) * progress);
-            
-            el.style.transform = `translateX(${x}px)`;
-
-            if (progress < 1) {
-                requestAnimationFrame(animate);
-            } else {
-                el.remove();
-            }
+        function showMenu() {
+            sideMenu.classList.remove('hidden');
         }
-        requestAnimationFrame(animate);
-    }
 
-    function showToast(msg) {
-        const t = document.getElementById('toast');
-        t.innerText = msg;
-        t.style.display = 'block';
-        setTimeout(() => t.style.display = 'none', 2000);
-    }
+        function hideMenu() {
+            sideMenu.classList.add('hidden');
+        }
 
-    function toggleMuteAll() {
-        showToast("全配信を一時停止/ミュート制御（実装準備中）");
-    }
-
-    function updateStyles() {
-        showToast("設定を反映しました");
-    }
-</script>
-
+        // 初期起動時も数秒後に隠す設定
+        handleUserActivity();
+    </script>
 </body>
 </html>
