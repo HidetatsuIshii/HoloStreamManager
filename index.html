@@ -106,6 +106,87 @@
 </div>
 
 <script>
+    // --- 設定値 ---
+    const FETCH_INTERVAL = 3000; // 3秒ごとに新着チェック
+    const PROXY_URL = "https://api.allorigins.win/get?url="; // CORS回避用プロキシ
+    
+    // 取得済みのコメントIDを記録（重複防止）
+    let processedMessageIds = new Set();
+    
+    async function applyStreams() {
+        const text = document.getElementById('url-list').value;
+        const ids = text.split(/\s+/).map(getYouTubeId).filter(id => id);
+        const grid = document.getElementById('video-grid');
+        grid.innerHTML = '';
+    
+        if (ids.length === 0) return;
+    
+        // レイアウト計算（前回同様）
+        setupLayout(ids.length);
+    
+        ids.forEach(id => {
+            const container = document.createElement('div');
+            container.className = 'video-container';
+            container.dataset.videoId = id; // IDを保持
+            
+            const iframe = document.createElement('iframe');
+            iframe.src = `https://www.youtube.com/embed/${id}?autoplay=1&mute=1`;
+            
+            const overlay = document.createElement('div');
+            overlay.className = 'comment-canvas';
+            
+            container.appendChild(iframe);
+            container.appendChild(overlay);
+            grid.appendChild(container);
+    
+            // 各動画に対してチャット取得ループを開始
+            startChatPoller(id, overlay);
+        });
+    }
+    
+    // チャットを定期的に監視する関数
+    async function startChatPoller(videoId, overlay) {
+        const chatUrl = encodeURIComponent(`https://www.youtube.com/live_chat?v=${videoId}`);
+        
+        const poll = async () => {
+            try {
+                // プロキシ経由でYouTubeチャットHTMLを取得
+                const response = await fetch(`${PROXY_URL}${chatUrl}`);
+                const data = await response.json();
+                const htmlString = data.contents;
+    
+                // 文字列をDOMとして解析
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(htmlString, 'text/html');
+                
+                // YouTubeのチャット要素（スクリプト内のJSONデータなどを探す）
+                // ※埋め込み型HTMLの場合、初期表示のコメントは特定のセレクタで取得可能
+                const messages = doc.querySelectorAll('.yt-live-chat-text-message-renderer');
+                
+                messages.forEach(msg => {
+                    const author = msg.querySelector('#author-name')?.innerText || "Guest";
+                    const text = msg.querySelector('#message')?.innerText || "";
+                    const msgId = msg.getAttribute('id');
+    
+                    if (text && !processedMessageIds.has(msgId)) {
+                        processedMessageIds.add(msgId);
+                        createComment(overlay, `${author}: ${text}`);
+                    }
+                });
+    
+                // メモリ節約のため古いIDを削除
+                if (processedMessageIds.size > 500) processedMessageIds.clear();
+    
+            } catch (e) {
+                console.error("Chat fetch error:", e);
+            }
+            
+            // 次の実行をスケジュール
+            setTimeout(poll, FETCH_INTERVAL);
+        };
+    
+        poll();
+    }
     let hideTimer;
 
     // サイドバーの自動隠蔽ロジック
