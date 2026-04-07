@@ -26,14 +26,13 @@
             border-right: 1px solid #333;
             z-index: 1000;
             transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            transform: translateX(-290px); /* 10pxだけ残して隠す */
+            transform: translateX(-290px);
         }
 
         #sidebar:hover, #sidebar.active {
             transform: translateX(0);
         }
 
-        /* サイドバー内のコンテンツ */
         .sidebar-content { padding: 20px; }
         h2 { font-size: 1.1rem; color: var(--accent); margin-top: 0; }
 
@@ -46,13 +45,11 @@
 
         .hint { font-size: 0.7rem; opacity: 0.6; margin: 10px 0; }
 
-        /* メイン視聴エリア（常に全画面） */
         #main-view {
             width: 100vw; height: 100vh;
             display: flex; align-items: center; justify-content: center;
         }
         
-        /* 配信数に応じてJSで制御するグリッド */
         #video-grid {
             width: 100%; height: 100%;
             display: grid;
@@ -67,7 +64,6 @@
 
         iframe { width: 100%; height: 100%; border: none; }
 
-        /* コメント層 */
         .comment-canvas {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             pointer-events: none; z-index: 100;
@@ -106,13 +102,24 @@
 </div>
 
 <script>
-    // --- 設定値 ---
-    const FETCH_INTERVAL = 5000; // 5秒ごとに新着チェック（負荷軽減のため少し延長）
-    const PROXY_URL = "https://api.allorigins.win/get?url="; 
-    let processedMessageIds = new Set();
     let hideTimer;
 
-    // サイドバーの自動隠蔽ロジック
+    // --- 拡張機能からのメッセージ受信設定 ---
+    if (window.chrome && chrome.runtime && chrome.runtime.onMessage) {
+        chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+            const { videoId, author, text } = request;
+            
+            // dataset.videoId を元に対象のコンテナを特定
+            const targetContainer = Array.from(document.querySelectorAll('.video-container'))
+                .find(c => c.dataset.videoId === videoId);
+            
+            if (targetContainer) {
+                const overlay = targetContainer.querySelector('.comment-canvas');
+                createComment(overlay, `${author}: ${text}`);
+            }
+        });
+    }
+
     const sidebar = document.getElementById('sidebar');
     sidebar.addEventListener('mousemove', () => {
         sidebar.classList.add('active');
@@ -128,7 +135,6 @@
         return m ? m[1] : null;
     }
 
-    // 配信数に応じたレイアウト設定
     function setupLayout(count) {
         const grid = document.getElementById('video-grid');
         let cols, rows;
@@ -163,8 +169,10 @@
         ids.forEach(id => {
             const container = document.createElement('div');
             container.className = 'video-container';
+            container.dataset.videoId = id; // 拡張機能からの照合に必要
             
             const iframe = document.createElement('iframe');
+            // 埋め込みプレイヤーの設定
             iframe.src = `https://www.youtube.com/embed/${id}?autoplay=1&mute=1`;
             
             const overlay = document.createElement('div');
@@ -173,47 +181,9 @@
             container.appendChild(iframe);
             container.appendChild(overlay);
             grid.appendChild(container);
-
-            // リアルチャット取得開始
-            startChatPoller(id, overlay);
         });
 
         sidebar.classList.remove('active');
-    }
-
-    async function startChatPoller(videoId, overlay) {
-        const chatUrl = encodeURIComponent(`https://www.youtube.com/live_chat?v=${videoId}`);
-        
-        const poll = async () => {
-            try {
-                const response = await fetch(`${PROXY_URL}${chatUrl}`);
-                const data = await response.json();
-                const htmlString = data.contents;
-
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(htmlString, 'text/html');
-                
-                // YouTubeのHTML構造に合わせたセレクタ（暫定）
-                const messages = doc.querySelectorAll('yt-live-chat-text-message-renderer');
-                
-                messages.forEach(msg => {
-                    const author = msg.querySelector('#author-name')?.innerText || "";
-                    const text = msg.querySelector('#message')?.innerText || "";
-                    const msgId = msg.getAttribute('id');
-
-                    if (text && !processedMessageIds.has(msgId)) {
-                        processedMessageIds.add(msgId);
-                        createComment(overlay, `${author}: ${text}`);
-                    }
-                });
-
-                if (processedMessageIds.size > 500) processedMessageIds.clear();
-            } catch (e) {
-                console.error("Chat fetch error:", e);
-            }
-            setTimeout(poll, FETCH_INTERVAL);
-        };
-        poll();
     }
 
     function createComment(container, text) {
@@ -231,6 +201,7 @@
 
         function animate(time) {
             const progress = (time - startTime) / duration;
+            // 画面を右から左へ流す
             el.style.transform = `translateX(-${(100 + 150) * progress}vw)`;
 
             if (progress < 1) {
