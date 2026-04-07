@@ -104,6 +104,20 @@
 <script>
     let hideTimer;
 
+    window.addEventListener("message", (event) => {
+        if (event.data.type === "FROM_EXTENSION") {
+            const { videoId, author, text } = event.data.data;
+            
+            const targetContainer = Array.from(document.querySelectorAll('.video-container'))
+                .find(c => c.dataset.videoId === videoId);
+            
+            if (targetContainer) {
+                const overlay = targetContainer.querySelector('.comment-canvas');
+                createComment(overlay, `${author}: ${text}`);
+            }
+        }
+    });
+
     // --- 拡張機能からのメッセージ受信設定 ---
     if (window.chrome && chrome.runtime && chrome.runtime.onMessage) {
         chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
