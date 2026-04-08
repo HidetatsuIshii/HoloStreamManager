@@ -17,7 +17,6 @@
             font-family: 'Segoe UI', sans-serif; overflow: hidden;
         }
 
-        /* 自動隠蔽サイドバー */
         #sidebar {
             position: fixed;
             top: 0; left: 0;
@@ -93,6 +92,13 @@
         <div style="margin-top:20px;">
             <label style="font-size: 12px;">文字サイズ</label>
             <input type="range" id="cfg-size" min="16" max="60" value="32" style="width:100%">
+            
+            <label style="font-size: 12px; margin-top:10px; display:block;">流れるスピード (秒)</label>
+            <input type="range" id="cfg-speed" min="2" max="15" value="6" step="1" style="width:100%">
+            <span style="font-size:10px;">※短いほど速い</span>
+        
+            <label style="font-size: 12px; margin-top:10px; display:block;">出現範囲（縦）</label>
+            <input type="range" id="cfg-range" min="10" max="95" value="80" style="width:100%">
         </div>
     </div>
 </div>
@@ -104,35 +110,21 @@
 <script>
     let hideTimer;
 
+    // --- メッセージ受信（receiver.jsからのバケツリレー） ---
     window.addEventListener("message", (event) => {
-        if (event.data.type === "FROM_EXTENSION") {
-            const { videoId, author, text } = event.data.data;
+        if (event.data && event.data.type === "FROM_EXTENSION") {
+            const { videoId, text } = event.data.data;
             
             const targetContainer = Array.from(document.querySelectorAll('.video-container'))
                 .find(c => c.dataset.videoId === videoId);
             
             if (targetContainer) {
                 const overlay = targetContainer.querySelector('.comment-canvas');
-                createComment(overlay, `${author}: ${text}`);
+                // テキストのみを表示（ユーザー名は含めない）
+                createComment(overlay, text);
             }
         }
     });
-
-    // --- 拡張機能からのメッセージ受信設定 ---
-    if (window.chrome && chrome.runtime && chrome.runtime.onMessage) {
-        chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-            const { videoId, author, text } = request;
-            
-            // dataset.videoId を元に対象のコンテナを特定
-            const targetContainer = Array.from(document.querySelectorAll('.video-container'))
-                .find(c => c.dataset.videoId === videoId);
-            
-            if (targetContainer) {
-                const overlay = targetContainer.querySelector('.comment-canvas');
-                createComment(overlay, `${author}: ${text}`);
-            }
-        });
-    }
 
     const sidebar = document.getElementById('sidebar');
     sidebar.addEventListener('mousemove', () => {
@@ -153,15 +145,11 @@
         const grid = document.getElementById('video-grid');
         let cols, rows;
 
-        if (count === 1) {
-            cols = 1; rows = 1;
-        } else if (count === 2) {
-            cols = 2; rows = 1;
-        } else if (count <= 4) {
-            cols = 2; rows = 2;
-        } else if (count <= 6) {
-            cols = 3; rows = 2;
-        } else {
+        if (count === 1) { cols = 1; rows = 1; }
+        else if (count === 2) { cols = 2; rows = 1; }
+        else if (count <= 4) { cols = 2; rows = 2; }
+        else if (count <= 6) { cols = 3; rows = 2; }
+        else {
             cols = Math.ceil(Math.sqrt(count));
             rows = Math.ceil(count / cols);
         }
@@ -171,8 +159,8 @@
     }
 
     async function applyStreams() {
-        const text = document.getElementById('url-list').value;
-        const ids = text.split(/\s+/).map(getYouTubeId).filter(id => id);
+        const textInput = document.getElementById('url-list').value;
+        const ids = textInput.split(/\s+/).map(getYouTubeId).filter(id => id);
         const grid = document.getElementById('video-grid');
         grid.innerHTML = '';
 
@@ -183,10 +171,9 @@
         ids.forEach(id => {
             const container = document.createElement('div');
             container.className = 'video-container';
-            container.dataset.videoId = id; // 拡張機能からの照合に必要
+            container.dataset.videoId = id;
             
             const iframe = document.createElement('iframe');
-            // 埋め込みプレイヤーの設定
             iframe.src = `https://www.youtube.com/embed/${id}?autoplay=1&mute=1`;
             
             const overlay = document.createElement('div');
@@ -197,6 +184,13 @@
             grid.appendChild(container);
         });
 
+        // 拡張機能のbackground.jsへ「この動画のチャット取得を開始せよ」と命令
+        // receiver.js経由ではなく、ページ上のスクリプトから直接送信を試みる（権限があれば）
+        // もし動かなければ、ここはreceiver.js側に転送ロジックが必要ですが、
+        // 一般的には以下のchrome.runtime.sendMessageは拡張機能ドメインでないと失敗します。
+        // なので、今回は window.postMessage で receiver.js に「取得開始」を伝えます。
+        window.postMessage({ type: "START_POLLING_REQUEST", videoIds: ids }, "*");
+
         sidebar.classList.remove('active');
     }
 
@@ -204,18 +198,21 @@
         const el = document.createElement('div');
         el.className = 'comment-text';
         el.innerText = text;
+
         const size = document.getElementById('cfg-size').value;
+        const speed = document.getElementById('cfg-speed').value;
+        const range = document.getElementById('cfg-range').value;
+
         el.style.fontSize = size + 'px';
-        el.style.top = Math.random() * 80 + '%';
+        el.style.top = Math.random() * range + '%';
         el.style.left = '100%';
         container.appendChild(el);
 
-        const duration = 6000 + Math.random() * 3000;
+        const duration = (parseFloat(speed) * 1000) + (Math.random() * 1000);
         const startTime = performance.now();
 
         function animate(time) {
             const progress = (time - startTime) / duration;
-            // 画面を右から左へ流す
             el.style.transform = `translateX(-${(100 + 150) * progress}vw)`;
 
             if (progress < 1) {
