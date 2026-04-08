@@ -88,12 +88,23 @@
 
         button { cursor: pointer; border: none; font-weight: bold; border-radius: 3px; background: #444; color: #fff; padding: 2px 6px; }
         .apply-btn { width: 100%; padding: 10px; background: var(--accent); color: #000; margin-top: 10px; }
+
+        .snap-preview {
+            position: fixed;
+            background: rgba(0, 212, 255, 0.2); /* アクセントカラーの薄い色 */
+            border: 2px dashed var(--accent);
+            pointer-events: none;
+            z-index: 8500; /* ガードより手前、ウィンドウより奥 */
+            display: none;
+            transition: all 0.15s ease;
+        }
     </style>
 </head>
 <body>
 
 <div id="global-guard"></div>
-
+<div id="snap-preview" class="snap-preview"></div>
+    
 <div id="sidebar" class="empty">
     <div class="sidebar-content">
         <h2 style="color: var(--accent); margin-bottom: 5px; font-size: 18px;">HoloStreamer Pro</h2>
@@ -149,8 +160,11 @@
             <div class="individual-config">
                 <div class="config-row">
                     <div style="display:flex; gap:5px; margin-bottom:5px;">
-                        <button onclick="sendCommand('${id}', 'playVideo')">▶</button>
-                        <button onclick="sendCommand('${id}', 'pauseVideo')">Ⅱ</button>
+                        <button onclick="sendCommand('${id}', 'playVideo')" title="再生">▶</button>
+                        <button onclick="sendCommand('${id}', 'pauseVideo')" title="一時停止">Ⅱ</button>
+                        <button onclick="sendCommand('${id}', 'mute')" title="ミュート">M</button>
+                        <button onclick="sendCommand('${id}', 'unMute')" title="解除">U</button>
+                        <button onclick="location.reload()" title="再読み込み" style="background:#222">R</button>
                     </div>
                     音量 <input type="range" min="0" max="100" value="50" oninput="sendCommand('${id}', 'setVolume', [this.value])" style="width:70px">
                 </div>
@@ -239,12 +253,41 @@
             let shiftX = e.clientX - win.getBoundingClientRect().left;
             let shiftY = e.clientY - win.getBoundingClientRect().top;
 
+            const preview = document.getElementById('snap-preview');
             const onMove = (ev) => {
                 win.style.left = ev.pageX - shiftX + 'px';
                 win.style.top = ev.pageY - shiftY + 'px';
+            
+                // スナップ予測の表示
+                const snapRange = 100;
+                const sw = window.innerWidth;
+                const sh = window.innerHeight;
+                const x = ev.clientX;
+                const y = ev.clientY;
+            
+                let preRect = null;
+                if (x < snapRange && y < snapRange) preRect = {l:0, t:0, w:sw/2, h:sh/2};
+                else if (x > sw - snapRange && y < snapRange) preRect = {l:sw/2, t:0, w:sw/2, h:sh/2};
+                else if (x < snapRange && y > sh - snapRange) preRect = {l:0, t:sh/2, w:sw/2, h:sh/2};
+                else if (x > sw - snapRange && y > sh - snapRange) preRect = {l:sw/2, t:sh/2, w:sw/2, h:sh/2};
+                else if (x < snapRange) preRect = {l:0, t:0, w:sw/2, h:sh};
+                else if (x > sw - snapRange) preRect = {l:sw/2, t:0, w:sw/2, h:sh};
+                else if (y < snapRange) preRect = {l:0, t:0, w:sw, h:sh/2};
+                else if (y > sh - snapRange) preRect = {l:0, t:sh/2, w:sw, h:sh/2};
+            
+                if (preRect) {
+                    preview.style.display = 'block';
+                    preview.style.left = preRect.l + 'px';
+                    preview.style.top = preRect.t + 'px';
+                    preview.style.width = preRect.w + 'px';
+                    preview.style.height = preRect.h + 'px';
+                } else {
+                    preview.style.display = 'none';
+                }
             };
 
             const onUp = (ev) => {
+                preview.style.display = 'none';
                 win.classList.remove('moving');
                 guard.style.display = 'none';
                 document.removeEventListener('mousemove', onMove);
@@ -312,6 +355,12 @@
                 const canvas = win.querySelector('.comment-canvas');
                 const el = document.createElement('div');
                 el.className = 'comment-text';
+                if (data.isMember) {
+                    el.style.color = 'var(--member-green)';
+                    el.style.textShadow = '1px 1px 2px #000';
+                }
+                // ニコニコ動画のように重ならないようにする簡易調整（ランダム幅を広げる）
+                el.style.top = (Math.floor(Math.random() * 15) * 6) + '%';
                 // INNERHTML に修正
                 el.innerHTML = data.text;
                 
