@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>HoloStreamer Pro - Borderless Canvas</title>
+    <title>HoloStreamer Pro - Fullscreen Canvas</title>
     <style>
         :root {
             --bg-dark: #050505;
@@ -45,6 +45,8 @@
         .stream-item.pinned { border-left-color: var(--accent); background: #2a2a2a; }
 
         /* ビデオウィンドウ */
+        #canvas { position: relative; width: 100vw; height: 100vh; overflow: hidden; cursor: default; }
+        
         .video-window {
             position: absolute; width: 480px; height: 270px;
             background: #000; border: 2px solid #333;
@@ -63,7 +65,6 @@
         }
         .video-window.interacting .drag-overlay { pointer-events: none; opacity: 0; }
 
-        /* 個別設定パネル（左上・小型化） */
         .individual-config {
             position: absolute; top: 5px; left: 5px;
             background: rgba(0,0,0,0.85); padding: 6px; border-radius: 4px;
@@ -86,7 +87,7 @@
 <div id="sidebar" class="empty">
     <div class="sidebar-content">
         <h2 style="color: var(--accent); margin-bottom: 5px; font-size: 18px;">HoloStreamer Pro</h2>
-        <textarea id="url-list" placeholder="URLを入力して展開..."></textarea>
+        <textarea id="url-list" placeholder="URLを改行して入力..."></textarea>
         <button class="apply-btn" onclick="applyStreams()">キャンバスに展開</button>
         
         <div id="stream-manager">
@@ -95,14 +96,14 @@
         </div>
 
         <div style="font-size:9px; color:#555; margin-top: auto; padding-top: 10px;">
-            ・ダブルクリック：動画操作モード<br>
-            ・枠外クリック：移動モード復帰<br>
-            ・右クリック：最背面へ送る
+            ・背景クリック：全画面切替<br>
+            ・ダブルクリック：操作モード<br>
+            ・右クリック：最背面へ
         </div>
     </div>
 </div>
 
-<div id="canvas"></div>
+<div id="canvas" onclick="handleCanvasClick(event)"></div>
 
 <script>
     let commentQueue = [];
@@ -114,6 +115,22 @@
         if (e.clientX < 20) sidebar.classList.add('active');
         else if (e.clientX > 300) sidebar.classList.remove('active');
     });
+
+    // 全画面表示のハンドリング
+    function handleCanvasClick(e) {
+        // クリックされたのがcanvasそのもの、またはドラッグ中のウィンドウでない場合のみ実行
+        if (e.target.id === 'canvas') {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.log(`Error attempting to enable full-screen mode: ${err.message}`);
+                });
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        }
+    }
 
     window.addEventListener("message", (event) => {
         if (event.data && event.data.type === "FROM_EXTENSION") {
@@ -133,10 +150,8 @@
 
     function createComment(win, data) {
         if (!win.querySelector('.cfg-show').checked) return;
-
         const size = win.querySelector('.cfg-size').value;
         const speedVal = win.querySelector('.cfg-speed').value;
-        // 速度：右にいくほど早くなる。 duration 15s(速度2) 〜 2s(速度15)
         const duration = (17 - speedVal) * 1000;
 
         const el = document.createElement('div');
@@ -164,12 +179,14 @@
         requestAnimationFrame(animate);
     }
 
+    function getYouTubeId(url) {
+        const m = url.match(/(?:v=|\/)([0-9A-Za-z_-]{11})/);
+        return m ? m[1] : null;
+    }
+
     function applyStreams() {
         const input = document.getElementById('url-list').value;
-        const ids = input.split(/\s+/).map(url => {
-            const m = url.match(/(?:v=|\/)([0-9A-Za-z_-]{11})/);
-            return m ? m[1] : null;
-        }).filter(id => id);
+        const ids = input.split(/\s+/).map(getYouTubeId).filter(id => id);
 
         if (ids.length > 0) sidebar.classList.remove('empty');
         ids.forEach((id, index) => {
@@ -188,6 +205,7 @@
         win.style.top = (50 + Math.floor(index / 4) * 60) + 'px';
         win.style.zIndex = windowZIndex++;
 
+        // 埋め込みドメインを nocookie にして制限回避
         win.innerHTML = `
             <div class="individual-config">
                 <label><input type="checkbox" class="cfg-show" checked> 表示</label><br>
@@ -197,24 +215,21 @@
             </div>
             <div class="video-content">
                 <div class="drag-overlay"></div>
-                <iframe class="main-video" src="https://www.youtube.com/embed/${id}?autoplay=1"></iframe>
+                <iframe class="main-video" src="https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0" allow="autoplay; encrypted-media; fullscreen"></iframe>
                 <iframe src="https://www.youtube.com/live_chat?v=${id}" style="display:none"></iframe>
                 <div class="comment-canvas"></div>
             </div>
         `;
 
         const overlay = win.querySelector('.drag-overlay');
-
         overlay.onmousedown = (e) => {
             if (win.dataset.pinned !== "true") win.style.zIndex = windowZIndex++;
             let shiftX = e.clientX - win.getBoundingClientRect().left;
             let shiftY = e.clientY - win.getBoundingClientRect().top;
-
             function moveAt(pageX, pageY) {
                 win.style.left = pageX - shiftX + 'px';
                 win.style.top = pageY - shiftY + 'px';
             }
-
             function onMouseMove(ev) { moveAt(ev.pageX, ev.pageY); }
             document.addEventListener('mousemove', onMouseMove);
             document.onmouseup = () => {
@@ -225,10 +240,9 @@
 
         overlay.ondblclick = () => {
             win.classList.add('interacting');
-            win.style.borderColor = "var(--accent)"; // 修正：クォーテーションを追加
+            win.style.borderColor = "var(--accent)";
         };
 
-        // 枠外クリックで操作終了
         window.addEventListener('mousedown', (e) => {
             if (!win.contains(e.target)) {
                 win.classList.remove('interacting');
@@ -254,7 +268,7 @@
             const item = document.createElement('div');
             item.className = 'stream-item' + (win.dataset.pinned === "true" ? ' pinned' : '');
             item.innerHTML = `
-                <span>ID: ${id}</span>
+                <span title="${id}">ID: ${id.substring(0,8)}...</span>
                 <div>
                     <button class="item-btn" onclick="togglePin('${id}')">📌</button>
                     <button class="item-btn" onclick="removeStream('${id}')" style="background:#600">✕</button>
