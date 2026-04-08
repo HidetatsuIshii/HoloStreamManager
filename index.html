@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>HoloStreamer Pro - Multi-Color SC</title>
+    <title>HoloStreamer Pro - Full Integration</title>
     <style>
         :root {
             --bg-dark: #000000;
@@ -25,11 +25,19 @@
         }
         #sidebar:hover, #sidebar.active { transform: translateX(0); }
         .sidebar-content { padding: 20px; }
-        textarea { width: 100%; height: 120px; background: #1e1e1e; color: #fff; border: 1px solid #444; border-radius: 4px; padding: 10px; box-sizing: border-box; }
+        
+        textarea {
+            width: 100%; height: 120px; background: #1e1e1e; color: #fff;
+            border: 1px solid #444; border-radius: 4px; padding: 10px; box-sizing: border-box;
+            font-family: monospace; font-size: 12px;
+        }
+
         #main-view { width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; }
         #video-grid { width: 100%; height: 100%; display: grid; gap: 2px; background: #000; }
         .video-container { position: relative; width: 100%; height: 100%; background: #000; overflow: hidden; }
-        iframe { width: 100%; height: 100%; border: none; }
+        
+        iframe.main-video { width: 100%; height: 100%; border: none; }
+        
         .comment-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100; }
 
         .comment-text {
@@ -44,15 +52,13 @@
 
         .comment-text.super-chat {
             z-index: 150;
-            /* 背景は色付き、枠はさらに強調 */
             background: rgba(0, 0, 0, 0.4);
             border: 3px solid transparent; 
         }
         
         .sc-amount {
             color: #000; padding: 1px 6px; border-radius: 4px;
-            margin-right: 8px; font-size: 0.85em; font-weight: bold;
-            text-shadow: none;
+            margin-right: 8px; font-size: 0.85em; font-weight: bold; text-shadow: none;
         }
 
         .youtube-emoji { height: 1.2em; margin: 0 2px; vertical-align: middle; }
@@ -64,12 +70,12 @@
 <div id="sidebar">
     <div class="sidebar-content">
         <h2>HoloStreamer Pro</h2>
-        <textarea id="url-list" placeholder="YouTube URL..."></textarea>
-        <button onclick="applyStreams()">適用</button>
+        <textarea id="url-list" placeholder="YouTube URLを改行区切りで入力..."></textarea>
+        <button onclick="applyStreams()">適用して表示</button>
         <div style="margin-top:20px;">
             <label style="font-size:12px;">文字サイズ</label><input type="range" id="cfg-size" min="16" max="60" value="32" style="width:100%">
             <label style="font-size:12px;">スピード</label><input type="range" id="cfg-speed" min="2" max="15" value="6" style="width:100%">
-            <label style="font-size:12px;">範囲</label><input type="range" id="cfg-range" min="10" max="95" value="80" style="width:100%">
+            <label style="font-size:12px;">出現範囲（縦）</label><input type="range" id="cfg-range" min="10" max="95" value="80" style="width:100%">
         </div>
     </div>
 </div>
@@ -82,6 +88,7 @@
     const LANE_COUNT = 15;
     let lastUsedLanes = [];
 
+    // メッセージ受信
     window.addEventListener("message", (event) => {
         if (event.data && event.data.type === "FROM_EXTENSION") {
             commentQueue.push(event.data.data);
@@ -98,15 +105,29 @@
         setTimeout(processQueue, commentQueue.length > 20 ? 5 : 50);
     }
 
+    // レイアウト設定関数（ここが不足していました）
+    function setupLayout(count) {
+        const grid = document.getElementById('video-grid');
+        let cols, rows;
+        if (count === 1) { cols = 1; rows = 1; }
+        else if (count === 2) { cols = 2; rows = 1; }
+        else if (count <= 4) { cols = 2; rows = 2; }
+        else {
+            cols = Math.ceil(Math.sqrt(count));
+            rows = Math.ceil(count / cols);
+        }
+        grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+        grid.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+    }
+
     function createComment(container, data) {
         const el = document.createElement('div');
         el.className = `comment-text ${data.type}`;
 
         let html = "";
         if (data.type === 'super-chat') {
-            // スパチャの色設定を適用
             el.style.borderColor = data.color;
-            el.style.backgroundColor = `${data.color}33`; // 20%の透過
+            el.style.backgroundColor = `${data.color}33`;
             html += `<span class="sc-amount" style="background-color: ${data.color}">${data.amount}</span>`;
         }
         html += data.text;
@@ -140,47 +161,44 @@
     }
 
     function getYouTubeId(url) { const m = url.match(/(?:v=|\/)([0-9A-Za-z_-]{11})/); return m ? m[1] : null; }
+
     function applyStreams() {
         const ids = document.getElementById('url-list').value.split(/\s+/).map(getYouTubeId).filter(id => id);
         const grid = document.getElementById('video-grid');
         grid.innerHTML = '';
-    
         if (ids.length === 0) return;
-    
+
         setupLayout(ids.length);
-    
+
         ids.forEach(id => {
             const container = document.createElement('div');
             container.className = 'video-container';
             container.dataset.videoId = id;
             
-            // 1. メインの動画プレイヤー
+            // メインプレイヤー
             const iframe = document.createElement('iframe');
+            iframe.className = 'main-video';
             iframe.src = `https://www.youtube.com/embed/${id}?autoplay=1&mute=1`;
             
-            // 2. 【重要】ギフト受け取り用の隠しチャット欄
-            // ログイン状態を維持し、システムに「視聴中」と認識させるためのもの
+            // 隠しチャット（ギフト受け取り資格用）
             const hiddenChat = document.createElement('iframe');
             hiddenChat.src = `https://www.youtube.com/live_chat?v=${id}`;
             hiddenChat.style.position = 'absolute';
             hiddenChat.style.width = '0px';
             hiddenChat.style.height = '0px';
             hiddenChat.style.border = 'none';
-            hiddenChat.style.pointerEvents = 'none';
-            hiddenChat.style.opacity = '0'; // 完全に隠す
+            hiddenChat.style.opacity = '0';
             
             const overlay = document.createElement('div');
             overlay.className = 'comment-canvas';
             
             container.appendChild(iframe);
-            container.appendChild(hiddenChat); // 隠しチャットを追加
+            container.appendChild(hiddenChat);
             container.appendChild(overlay);
             grid.appendChild(container);
         });
-    
-        commentQueue = [];
+
         window.postMessage({ type: "START_POLLING_REQUEST", videoIds: ids }, "*");
-        sidebar.classList.remove('active');
     }
 </script>
 </body>
