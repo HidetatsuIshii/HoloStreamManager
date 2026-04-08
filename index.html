@@ -173,9 +173,6 @@
                 <div class="config-row">
                     <div style="display:flex; gap:5px; margin-bottom:5px;">
                         <button class="play-pause-btn" onclick="togglePlay('${id}')">▶</button>
-                        <button onclick="sendCommand('${id}', 'mute')" title="ミュート">M</button>
-                        <button onclick="sendCommand('${id}', 'unMute')" title="解除">U</button>
-                        <button onclick="location.reload()" title="再読み込み" style="background:#222">R</button>
                     </div>
                     音量 <input type="range" min="0" max="100" value="50" oninput="sendCommand('${id}', 'setVolume', [this.value])" style="width:70px">
                 </div>
