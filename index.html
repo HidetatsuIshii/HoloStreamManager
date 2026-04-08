@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>HoloStreamer Pro - OS Style Canvas</title>
+    <title>HoloStreamer Pro - Heavy Duty</title>
     <style>
         :root {
             --bg-dark: #050505;
@@ -38,9 +38,8 @@
 
         #stream-manager { margin-top: 20px; flex: 1; overflow-y: auto; }
         .stream-item {
-            background: #222; margin-bottom: 5px; padding: 8px;
-            border-radius: 4px; display: flex; justify-content: space-between; align-items: center;
-            font-size: 11px; border-left: 3px solid #555;
+            background: #222; margin-bottom: 5px; padding: 8px; border-radius: 4px;
+            display: flex; justify-content: space-between; align-items: center; font-size: 11px;
         }
 
         /* ビデオウィンドウ */
@@ -52,61 +51,57 @@
             box-shadow: 0 10px 40px rgba(0,0,0,0.8);
             display: flex; flex-direction: column;
             overflow: hidden; min-width: 200px; min-height: 120px;
-            transition: width 0.2s, height 0.2s, left 0.2s, top 0.2s; /* スナップ時のアニメーション */
+            transition: width 0.15s, height 0.15s, left 0.15s, top 0.15s, border-color 0.2s;
         }
-        .video-window.dragging { transition: none; } /* ドラッグ中はアニメーションをオフ */
+        .video-window.moving { transition: none; } /* 移動・リサイズ中はアニメオフ */
 
         .video-content { flex: 1; position: relative; width: 100%; height: 100%; }
         iframe.main-video { width: 100%; height: 100%; border: none; pointer-events: none; }
         .video-window.interacting iframe.main-video { pointer-events: auto; }
         
+        /* 操作用透明レイヤー */
         .drag-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             z-index: 10; cursor: move; background: transparent;
         }
         .video-window.interacting .drag-overlay { pointer-events: none; }
 
-        /* 統合コントロールパネル（左上） */
+        /* リサイズ・ドラッグ中の全画面ガード */
+        #global-guard {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            z-index: 9000; display: none; background: transparent;
+        }
+
+        /* 統合コントロールパネル */
         .individual-config {
             position: absolute; top: 10px; left: 10px;
-            background: rgba(0,0,0,0.9); padding: 10px; border-radius: 6px;
+            background: rgba(0,0,0,0.95); padding: 10px; border-radius: 6px;
             display: none; z-index: 200; font-size: 10px; width: 130px;
             border: 1px solid #555; transform: scale(0.85); transform-origin: top left;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
         .video-window:hover .individual-config { display: block; }
-
         .config-row { margin-bottom: 8px; border-bottom: 1px solid #333; padding-bottom: 4px; }
-        .config-row:last-child { border: none; }
-        .ctrl-btns { display: flex; gap: 5px; margin-bottom: 5px; }
         
         .comment-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100; overflow: hidden; }
         .comment-text { position: absolute; white-space: nowrap; font-weight: 900; color: white; text-shadow: 2px 2px 2px #000; will-change: transform; }
+        .comment-text img { height: 1.2em; vertical-align: middle; } /* 絵文字サイズ調整 */
 
         button { cursor: pointer; border: none; font-weight: bold; border-radius: 3px; background: #444; color: #fff; padding: 2px 6px; }
-        button:hover { background: #666; }
-        .apply-btn { width: 100%; padding: 10px; background: var(--accent); color: #000; margin-top: 10px; font-size: 14px; }
-        
-        input[type="range"] { vertical-align: middle; }
+        .apply-btn { width: 100%; padding: 10px; background: var(--accent); color: #000; margin-top: 10px; }
     </style>
 </head>
 <body>
+
+<div id="global-guard"></div>
 
 <div id="sidebar" class="empty">
     <div class="sidebar-content">
         <h2 style="color: var(--accent); margin-bottom: 5px; font-size: 18px;">HoloStreamer Pro</h2>
         <textarea id="url-list" placeholder="URLを改行して入力..."></textarea>
         <button class="apply-btn" onclick="applyStreams()">キャンバスに展開</button>
-        
         <div id="stream-manager">
             <p style="font-size: 10px; color: #666; border-bottom: 1px solid #333; padding-bottom: 5px; margin-top: 15px;">ACTIVE STREAMS</p>
             <div id="stream-list"></div>
-        </div>
-
-        <div style="font-size:9px; color:#555; margin-top: auto; padding-top: 10px;">
-            ・背景クリック：全画面<br>
-            ・端までドラッグ：スナップ(1/2, 1/4)<br>
-            ・右クリック：最前面
         </div>
     </div>
 </div>
@@ -115,7 +110,7 @@
 
 <script>
     let windowZIndex = 100;
-    const playerApis = {}; // IFramePlayerAPI用
+    const guard = document.getElementById('global-guard');
 
     function handleCanvasClick(e) {
         if (e.target.id === 'canvas') {
@@ -124,12 +119,9 @@
         }
     }
 
-    // YouTube操作用のコマンド送信
     function sendCommand(id, cmd, arg) {
         const frame = document.querySelector(`[data-video-id="${id}"] iframe.main-video`);
-        if (frame) {
-            frame.contentWindow.postMessage(JSON.stringify({ event: 'command', func: cmd, args: arg || [] }), '*');
-        }
+        if (frame) frame.contentWindow.postMessage(JSON.stringify({ event: 'command', func: cmd, args: arg || [] }), '*');
     }
 
     function applyStreams() {
@@ -137,7 +129,6 @@
             const m = url.match(/(?:v=|\/)([0-9A-Za-z_-]{11})/);
             return m ? m[1] : null;
         }).filter(id => id);
-
         if (ids.length > 0) sidebar.classList.remove('empty');
         ids.forEach((id, index) => {
             if (document.querySelector(`[data-video-id="${id}"]`)) return;
@@ -157,14 +148,14 @@
         win.innerHTML = `
             <div class="individual-config">
                 <div class="config-row">
-                    <div class="ctrl-btns">
+                    <div style="display:flex; gap:5px; margin-bottom:5px;">
                         <button onclick="sendCommand('${id}', 'playVideo')">▶</button>
                         <button onclick="sendCommand('${id}', 'pauseVideo')">Ⅱ</button>
                     </div>
                     音量 <input type="range" min="0" max="100" value="50" oninput="sendCommand('${id}', 'setVolume', [this.value])" style="width:70px">
                 </div>
                 <div class="config-row">
-                    <label><input type="checkbox" class="cfg-show" checked> コメント表示</label><br>
+                    <label><input type="checkbox" class="cfg-show" checked> 表示</label><br>
                     サイズ <input type="range" class="cfg-size" min="10" max="60" value="24" style="width:100%"><br>
                     速度 <input type="range" class="cfg-speed" min="1" max="20" value="10" style="width:100%">
                 </div>
@@ -176,14 +167,14 @@
             </div>
         `;
 
-        // --- リサイズ & スナップ実装 ---
         let isResizing = false;
         let currentHandle = '';
 
+        // --- リサイズ判定（広範囲：30px） ---
         win.onmousemove = (e) => {
-            if (win.classList.contains('interacting')) return;
+            if (win.classList.contains('interacting') || isResizing) return;
             const rect = win.getBoundingClientRect();
-            const hit = 15; // 判定範囲を広めに
+            const hit = 30; // 判定範囲を大幅に拡大
             let cursor = '';
             
             if (e.clientY - rect.top < hit) cursor += 'n';
@@ -198,6 +189,10 @@
         win.onmousedown = (e) => {
             if (win.style.cursor.includes('resize')) {
                 isResizing = true;
+                guard.style.display = 'block';
+                guard.style.cursor = win.style.cursor;
+                win.classList.add('moving');
+
                 const startW = win.offsetWidth;
                 const startH = win.offsetHeight;
                 const startX = e.clientX;
@@ -221,6 +216,8 @@
                 };
                 const onUp = () => {
                     isResizing = false;
+                    guard.style.display = 'none';
+                    win.classList.remove('moving');
                     document.removeEventListener('mousemove', onMove);
                     document.removeEventListener('mouseup', onUp);
                 };
@@ -230,12 +227,15 @@
             }
         };
 
-        // ドラッグ & スナップ
+        // ドラッグ & スナップ（判定 100px）
         const overlay = win.querySelector('.drag-overlay');
         overlay.onmousedown = (e) => {
             if (isResizing) return;
-            win.classList.add('dragging');
+            win.classList.add('moving');
             win.style.zIndex = windowZIndex++;
+            guard.style.display = 'block';
+            guard.style.cursor = 'move';
+
             let shiftX = e.clientX - win.getBoundingClientRect().left;
             let shiftY = e.clientY - win.getBoundingClientRect().top;
 
@@ -245,34 +245,30 @@
             };
 
             const onUp = (ev) => {
-                win.classList.remove('dragging');
+                win.classList.remove('moving');
+                guard.style.display = 'none';
                 document.removeEventListener('mousemove', onMove);
                 document.removeEventListener('mouseup', onUp);
 
-                // スナップ判定
-                const threshold = 30; // 端から何pxでスナップするか
+                const snapRange = 100; // スナップ判定範囲を拡大
                 const sw = window.innerWidth;
                 const sh = window.innerHeight;
                 const x = ev.clientX;
                 const y = ev.clientY;
 
-                // 角の判定 (1/4サイズ)
-                if (x < threshold && y < threshold) snap(0, 0, sw/2, sh/2);
-                else if (x > sw - threshold && y < threshold) snap(sw/2, 0, sw/2, sh/2);
-                else if (x < threshold && y > sh - threshold) snap(0, sh/2, sw/2, sh/2);
-                else if (x > sw - threshold && y > sh - threshold) snap(sw/2, sh/2, sw/2, sh/2);
-                // 辺の判定 (1/2サイズ)
-                else if (x < threshold) snap(0, 0, sw/2, sh);
-                else if (x > sw - threshold) snap(sw/2, 0, sw/2, sh);
-                else if (y < threshold) snap(0, 0, sw, sh/2);
-                else if (y > sh - threshold) snap(0, sh/2, sw, sh/2);
+                if (x < snapRange && y < snapRange) snap(0, 0, sw/2, sh/2); // 左上
+                else if (x > sw - snapRange && y < snapRange) snap(sw/2, 0, sw/2, sh/2); // 右上
+                else if (x < snapRange && y > sh - snapRange) snap(0, sh/2, sw/2, sh/2); // 左下
+                else if (x > sw - snapRange && y > sh - snapRange) snap(sw/2, sh/2, sw/2, sh/2); // 右下
+                else if (x < snapRange) snap(0, 0, sw/2, sh); // 左
+                else if (x > sw - snapRange) snap(sw/2, 0, sw/2, sh); // 右
+                else if (y < snapRange) snap(0, 0, sw, sh/2); // 上
+                else if (y > sh - snapRange) snap(0, sh/2, sw, sh/2); // 下
             };
 
             function snap(l, t, w, h) {
-                win.style.left = l + 'px';
-                win.style.top = t + 'px';
-                win.style.width = w + 'px';
-                win.style.height = h + 'px';
+                win.style.left = l + 'px'; win.style.top = t + 'px';
+                win.style.width = w + 'px'; win.style.height = h + 'px';
             }
 
             document.addEventListener('mousemove', onMove);
@@ -284,11 +280,7 @@
             if (!win.contains(e.target)) win.classList.remove('interacting');
         });
 
-        win.oncontextmenu = (e) => {
-            e.preventDefault();
-            win.style.zIndex = windowZIndex++;
-        };
-
+        win.oncontextmenu = (e) => { e.preventDefault(); win.style.zIndex = windowZIndex++; };
         document.getElementById('canvas').appendChild(win);
     }
 
@@ -311,7 +303,7 @@
         updateStreamList();
     }
 
-    // コメント受信ロジック（前回のものを流用）
+    // コメント受信：innerHTMLを使用して絵文字を復活
     window.addEventListener("message", (event) => {
         if (event.data && event.data.type === "FROM_EXTENSION") {
             const data = event.data.data;
@@ -320,7 +312,9 @@
                 const canvas = win.querySelector('.comment-canvas');
                 const el = document.createElement('div');
                 el.className = 'comment-text';
-                el.innerText = data.text;
+                // INNERHTML に修正
+                el.innerHTML = data.text;
+                
                 const size = win.querySelector('.cfg-size').value;
                 const duration = (22 - win.querySelector('.cfg-speed').value) * 800;
                 el.style.fontSize = size + 'px';
