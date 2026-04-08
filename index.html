@@ -2,14 +2,15 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>HoloStreamer Pro - Command Center</title>
+    <title>HoloStreamer Pro - Command Center v2</title>
     <style>
         :root {
             --bg-dark: #050505;
-            --panel-bg: rgba(25, 25, 25, 0.98);
+            --panel-bg: rgba(20, 20, 20, 0.98);
             --accent: #00d4ff;
             --text: #e0e0e0;
-            --sidebar-width: 300px;
+            --member-green: #2ba640;
+            --sidebar-width: 280px;
         }
 
         body, html {
@@ -22,8 +23,8 @@
 
         /* サイドバー開閉ボタン (Gemini風) */
         #menu-toggle {
-            position: fixed; top: 15px; left: 15px; width: 40px; height: 40px;
-            background: rgba(40, 40, 40, 0.5); border-radius: 50%;
+            position: fixed; top: 15px; left: 15px; width: 42px; height: 42px;
+            background: rgba(40, 40, 40, 0.4); border-radius: 50%;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
             cursor: pointer; z-index: 10001; transition: background 0.2s; border: 1px solid rgba(255,255,255,0.1);
         }
@@ -36,51 +37,50 @@
             background: var(--panel-bg); border-right: 1px solid #333;
             z-index: 10000; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             transform: translateX(-100%); display: flex; flex-direction: column;
+            box-shadow: 10px 0 30px rgba(0,0,0,0.5);
         }
         #sidebar.open { transform: translateX(0); }
+        .sidebar-inner { padding: 70px 20px 20px 20px; overflow-y: auto; flex: 1; }
 
-        .sidebar-inner { padding: 60px 20px 20px 20px; overflow-y: auto; flex: 1; }
-        
         /* レイアウト切替ボタン */
-        .layout-group { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 20px; }
-        .layout-btn { background: #333; padding: 8px; font-size: 11px; color: #fff; text-align: center; border: 1px solid #444; }
+        .layout-group { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 25px; }
+        .layout-btn { background: #333; padding: 10px; font-size: 11px; color: #fff; border: 1px solid #444; border-radius: 4px; cursor: pointer; }
         .layout-btn:hover { background: var(--accent); color: #000; }
 
-        /* ホロライブチャンネルリスト */
-        .channel-list { margin-top: 20px; }
-        .channel-header { font-size: 12px; color: #888; margin-bottom: 10px; display: flex; align-items: center; }
+        /* チャンネルリスト */
         .channel-item {
-            display: flex; align-items: center; padding: 8px 10px; cursor: pointer;
-            border-radius: 8px; transition: background 0.2s; margin-bottom: 2px;
+            display: flex; align-items: center; padding: 8px; cursor: pointer;
+            border-radius: 8px; transition: background 0.2s;
         }
-        .channel-item:hover { background: rgba(255,255,255,0.05); }
-        .channel-icon { width: 32px; height: 32px; border-radius: 50%; margin-right: 12px; background: #444; }
-        .channel-name { flex: 1; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .live-dot { width: 4px; height: 4px; background: #00aaff; border-radius: 50%; margin-left: 5px; }
+        .channel-item:hover { background: rgba(255,255,255,0.1); }
+        .channel-icon { width: 32px; height: 32px; border-radius: 50%; margin-right: 12px; background: #555; }
+        .channel-name { flex: 1; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .live-dot { width: 6px; height: 6px; background: #00aaff; border-radius: 50%; }
 
         /* ビデオウィンドウ */
-        #canvas { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+        #canvas { position: relative; width: 100vw; height: 100vh; }
         .video-window {
             position: absolute; background: #000; border: 2px solid #333;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.8); display: flex; flex-direction: column; overflow: hidden;
-            transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8); display: flex; flex-direction: column;
+            overflow: hidden; min-width: 200px; min-height: 120px;
+            transition: width 0.3s, height 0.3s, left 0.3s, top 0.3s;
         }
         .video-window.moving { transition: none; }
+        .video-content { flex: 1; position: relative; width: 100%; height: 100%; }
         iframe.main-video { width: 100%; height: 100%; border: none; pointer-events: none; }
         .video-window.interacting iframe.main-video { pointer-events: auto; }
         .drag-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; cursor: move; }
 
+        /* ガードと設定 */
         #global-guard { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 9000; display: none; }
-
-        /* 設定メニュー（左上） */
         .individual-config {
-            position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.9); padding: 8px;
+            position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.9); padding: 10px;
             border-radius: 6px; display: none; z-index: 200; width: 130px; border: 1px solid #555; transform: scale(0.85); transform-origin: top left;
         }
         .video-window:hover .individual-config { display: block; }
-
+        
         .comment-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100; overflow: hidden; }
-        .comment-text { position: absolute; white-space: nowrap; font-weight: 900; color: white; text-shadow: 2px 2px 2px #000; }
+        .comment-text { position: absolute; white-space: nowrap; font-weight: 900; color: white; text-shadow: 2px 2px 2px #000; will-change: transform; }
         .comment-text img { height: 1.2em; vertical-align: middle; }
     </style>
 </head>
@@ -94,7 +94,7 @@
 
 <div id="sidebar">
     <div class="sidebar-inner">
-        <p style="color:var(--accent); font-weight:bold; margin-bottom:15px;">Monitor Layout</p>
+        <p style="color:var(--accent); font-weight:bold; margin-bottom:10px; font-size:14px;">Layout Presets</p>
         <div class="layout-group">
             <button class="layout-btn" onclick="applyLayout(2)">2 画面</button>
             <button class="layout-btn" onclick="applyLayout(3)">3 画面</button>
@@ -102,69 +102,78 @@
             <button class="layout-btn" onclick="applyLayout(6)">6 画面</button>
         </div>
 
-        <div class="channel-list">
-            <div class="channel-header">登録チャンネル ></div>
-            <div id="live-members">
-                </div>
-        </div>
+        <p style="color:#888; font-size:12px; margin-bottom:10px;">登録チャンネル</p>
+        <div id="live-members"></div>
 
-        <p style="font-size:10px; color:#555; margin-top:30px;">URL直接入力</p>
-        <textarea id="url-list" style="width:100%; height:60px; background:#111; color:#0f0; border:1px solid #333;"></textarea>
-        <button onclick="addStreamsFromText()" style="width:100%; padding:8px; margin-top:5px; background:var(--accent); color:#000; border:none; font-weight:bold; cursor:pointer;">追加</button>
+        <p style="color:#888; font-size:11px; margin-top:30px;">URL直接入力 (改行区切り)</p>
+        <textarea id="url-list" style="width:100%; height:60px; background:#111; color:#0f0; border:1px solid #333; border-radius:4px; font-size:10px;"></textarea>
+        <button onclick="addStreamsFromText()" style="width:100%; padding:10px; margin-top:8px; background:var(--accent); color:#000; border:none; font-weight:bold; cursor:pointer; border-radius:4px;">キャンバスに追加</button>
     </div>
 </div>
 
 <div id="canvas" onclick="handleCanvasClick(event)"></div>
 
 <script>
+    let windowZIndex = 100;
+    const guard = document.getElementById('global-guard');
+
+    // チャンネルリスト用データ（URLからIDを抜粋）
     const members = [
-        { name: "音ノ瀬らこ / Otonose Rako", id: "k-fA22Gsc98", icon: "https://yt3.ggpht.com/u_5YVvO1qO779WnK8D0MvR8m96p9K2o2mE2m7fB2fGv8p8p8p8p8p8p8p8p8p8p8=s88-c-k-c0x00ffffff-no-rj" },
-        { name: "Pekora Ch. 兎田ぺこら", id: "VIs2L2fS_8M", icon: "https://yt3.ggpht.com/ytc/AIdro_nF7m6X3x_4p9Y6S7W0O9E9H9X9W9E9H9X9W9E9H9X9=s88-c-k-c0x00ffffff-no-rj" },
-        { name: "ミリプロ - Million Production", id: "Fp8m6p9K2o2", icon: "https://yt3.ggpht.com/ytc/AIdro_m6p9K2o2mE2m7fB2fGv8p8p8p8p8p8p8p8p8p8p8=s88-c-k-c0x00ffffff-no-rj" },
-        { name: "Noel Ch. 白銀ノエル", id: "bHnE4p9Y6S7", icon: "https://yt3.ggpht.com/ytc/AIdro_nE4p9Y6S7W0O9E9H9X9W9E9H9X9W9E9H9X9=s88-c-k-c0x00ffffff-no-rj" }
+        { name: "音ノ瀬らこ", id: "0w9m6B4W8sM" },
+        { name: "兎田ぺこら", id: "VIs2L2fS_8M" },
+        { name: "白銀ノエル", id: "bHnE4p9Y6S7" },
+        { name: "甘狼このみ", id: "m6v-n_mY2iM" },
+        { name: "ミリプロ", id: "Fp8m6p9K2o2" }
     ];
 
     function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
 
+    // サイドバーのチャンネルリスト生成
     function initMemberList() {
-        const list = document.getElementById('live-members');
+        const container = document.getElementById('live-members');
         members.forEach(m => {
             const item = document.createElement('div');
             item.className = 'channel-item';
-            item.onclick = () => createVideoWindow(m.id);
+            item.onclick = () => { createVideoWindow(m.id); toggleSidebar(); };
             item.innerHTML = `
-                <img class="channel-icon" src="${m.icon}">
+                <div class="channel-icon"></div>
                 <div class="channel-name">${m.name}</div>
                 <div class="live-dot"></div>
             `;
-            list.appendChild(item);
+            container.appendChild(item);
         });
     }
 
-    function applyLayout(count) {
-        const windows = Array.from(document.querySelectorAll('.video-window'));
-        const sw = window.innerWidth;
-        const sh = window.innerHeight;
+    // 全画面切り替え
+    function handleCanvasClick(e) {
+        if (e.target.id === 'canvas') {
+            if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+            else document.exitFullscreen();
+        }
+    }
 
-        windows.forEach((win, i) => {
-            if (i >= count) return;
-            let w, h, l, t;
-            if (count === 2) { w = sw / 2; h = sh; l = (i % 2) * w; t = 0; }
-            else if (count === 3) { 
-                if (i === 0) { w = sw * 0.6; h = sh; l = 0; t = 0; }
-                else { w = sw * 0.4; h = sh / 2; l = sw * 0.6; t = (i - 1) * h; }
-            }
-            else if (count === 4) { w = sw / 2; h = sh / 2; l = (i % 2) * w; t = Math.floor(i / 2) * h; }
-            else if (count === 6) { w = sw / 3; h = sh / 2; l = (i % 3) * w; t = Math.floor(i / 3) * h; }
+    // YouTubeコマンド送信
+    function sendCommand(id, cmd, arg) {
+        const frame = document.querySelector(`[data-video-id="${id}"] iframe.main-video`);
+        if (frame) frame.contentWindow.postMessage(JSON.stringify({ event: 'command', func: cmd, args: arg || [] }), '*');
+    }
 
-            win.style.width = w + 'px'; win.style.height = h + 'px';
-            win.style.left = l + 'px'; win.style.top = t + 'px';
-        });
+    // テキストエリアから追加
+    function addStreamsFromText() {
+        const val = document.getElementById('url-list').value;
+        const ids = val.split(/\s+/).map(url => {
+            const m = url.match(/(?:v=|\/)([0-9A-Za-z_-]{11})/);
+            return m ? m[1] : null;
+        }).filter(id => id);
+        ids.forEach(id => createVideoWindow(id));
+        document.getElementById('url-list').value = '';
         toggleSidebar();
     }
 
+    // 動画ウィンドウ作成
     function createVideoWindow(id) {
         if (document.querySelector(`[data-video-id="${id}"]`)) return;
+        
         const win = document.createElement('div');
         win.className = 'video-window';
         win.dataset.videoId = id;
@@ -174,10 +183,12 @@
 
         win.innerHTML = `
             <div class="individual-config">
-                <button onclick="sendCommand('${id}', 'playVideo')">▶</button>
-                <button onclick="sendCommand('${id}', 'pauseVideo')">Ⅱ</button>
-                <input type="range" min="0" max="100" value="50" oninput="sendCommand('${id}', 'setVolume', [this.value])" style="width:100%"><br>
-                <label><input type="checkbox" class="cfg-show" checked> 表示</label><br>
+                <div style="display:flex; gap:5px; margin-bottom:8px;">
+                    <button onclick="sendCommand('${id}', 'playVideo')" style="background:#444;color:#fff;border:none;padding:2px 8px;cursor:pointer;">▶</button>
+                    <button onclick="sendCommand('${id}', 'pauseVideo')" style="background:#444;color:#fff;border:none;padding:2px 8px;cursor:pointer;">Ⅱ</button>
+                </div>
+                音量 <input type="range" min="0" max="100" value="50" oninput="sendCommand('${id}', 'setVolume', [this.value])" style="width:70px"><br>
+                <label style="font-size:10px;"><input type="checkbox" class="cfg-show" checked> 表示</label><br>
                 速度 <input type="range" class="cfg-speed" min="1" max="20" value="10" style="width:100%">
             </div>
             <div class="video-content">
@@ -187,35 +198,153 @@
             </div>
         `;
 
-        // リサイズ & ドラッグ処理（前回同様）
         setupInteractions(win);
         document.getElementById('canvas').appendChild(win);
+        // 拡張機能へポーリング開始を通知
+        window.postMessage({ type: "START_POLLING_REQUEST", videoIds: [id] }, "*");
     }
 
+    // インタラクション（ドラッグ・リサイズ・スナップ）
     function setupInteractions(win) {
+        let isResizing = false;
+        let currentHandle = '';
+
+        win.onmousemove = (e) => {
+            if (win.classList.contains('interacting') || isResizing) return;
+            const rect = win.getBoundingClientRect();
+            const hit = 30;
+            let cursor = '';
+            if (e.clientY - rect.top < hit) cursor += 'n';
+            else if (rect.bottom - e.clientY < hit) cursor += 's';
+            if (e.clientX - rect.left < hit) cursor += 'w';
+            else if (rect.right - e.clientX < hit) cursor += 'e';
+            win.style.cursor = cursor ? cursor + '-resize' : 'default';
+            currentHandle = cursor;
+        };
+
+        win.onmousedown = (e) => {
+            if (win.style.cursor.includes('resize')) {
+                isResizing = true;
+                guard.style.display = 'block';
+                guard.style.cursor = win.style.cursor;
+                win.classList.add('moving');
+                const startW = win.offsetWidth, startH = win.offsetHeight;
+                const startX = e.clientX, startY = e.clientY;
+                const startL = win.offsetLeft, startT = win.offsetTop;
+
+                const onMove = (ev) => {
+                    if (currentHandle.includes('e')) win.style.width = Math.max(200, startW + (ev.clientX - startX)) + 'px';
+                    if (currentHandle.includes('s')) win.style.height = Math.max(120, startH + (ev.clientY - startY)) + 'px';
+                    if (currentHandle.includes('w')) {
+                        const newW = Math.max(200, startW - (ev.clientX - startX));
+                        win.style.left = (startL + startW - newW) + 'px';
+                        win.style.width = newW + 'px';
+                    }
+                    if (currentHandle.includes('n')) {
+                        const newH = Math.max(120, startH - (ev.clientY - startY));
+                        win.style.top = (startT + startH - newH) + 'px';
+                        win.style.height = newH + 'px';
+                    }
+                };
+                const onUp = () => {
+                    isResizing = false; guard.style.display = 'none';
+                    win.classList.remove('moving');
+                    document.removeEventListener('mousemove', onMove);
+                    document.removeEventListener('mouseup', onUp);
+                };
+                document.addEventListener('mousemove', onMove);
+                document.addEventListener('mouseup', onUp);
+            }
+        };
+
         const overlay = win.querySelector('.drag-overlay');
         overlay.onmousedown = (e) => {
+            if (isResizing) return;
             win.classList.add('moving');
             win.style.zIndex = windowZIndex++;
+            guard.style.display = 'block';
             let shiftX = e.clientX - win.getBoundingClientRect().left;
             let shiftY = e.clientY - win.getBoundingClientRect().top;
+
             const onMove = (ev) => {
                 win.style.left = ev.pageX - shiftX + 'px';
                 win.style.top = ev.pageY - shiftY + 'px';
             };
-            const onUp = () => {
-                win.classList.remove('moving');
+
+            const onUp = (ev) => {
+                win.classList.remove('moving'); guard.style.display = 'none';
                 document.removeEventListener('mousemove', onMove);
                 document.removeEventListener('mouseup', onUp);
+
+                // スナップ
+                const snap = 100, sw = window.innerWidth, sh = window.innerHeight;
+                const x = ev.clientX, y = ev.clientY;
+                const set = (l, t, w, h) => { win.style.left = l+'px'; win.style.top = t+'px'; win.style.width = w+'px'; win.style.height = h+'px'; };
+
+                if (x < snap && y < snap) set(0, 0, sw/2, sh/2);
+                else if (x > sw - snap && y < snap) set(sw/2, 0, sw/2, sh/2);
+                else if (x < snap && y > sh - snap) set(0, sh/2, sw/2, sh/2);
+                else if (x > sw - snap && y > sh - snap) set(sw/2, sh/2, sw/2, sh/2);
+                else if (x < snap) set(0, 0, sw/2, sh);
+                else if (x > sw - snap) set(sw/2, 0, sw/2, sh);
+                else if (y < snap) set(0, 0, sw, sh/2);
+                else if (y > sh - snap) set(0, sh/2, sw, sh/2);
             };
             document.addEventListener('mousemove', onMove);
             document.addEventListener('mouseup', onUp);
         };
+
         overlay.ondblclick = () => win.classList.add('interacting');
+        window.addEventListener('mousedown', (e) => { if (!win.contains(e.target)) win.classList.remove('interacting'); });
         win.oncontextmenu = (e) => { e.preventDefault(); win.style.zIndex = windowZIndex++; };
     }
 
-    // 他、全画面、コマンド送信、コメント描画、追加ロジックは前回同様に統合
+    // レイアウトプリセット適用
+    function applyLayout(count) {
+        const windows = Array.from(document.querySelectorAll('.video-window')).slice(0, count);
+        const sw = window.innerWidth, sh = window.innerHeight;
+        windows.forEach((win, i) => {
+            let w, h, l, t;
+            if (count === 2) { w = sw/2; h = sh; l = i*w; t = 0; }
+            else if (count === 3) {
+                if (i===0) { w = sw*0.6; h = sh; l = 0; t = 0; }
+                else { w = sw*0.4; h = sh/2; l = sw*0.6; t = (i-1)*h; }
+            }
+            else if (count === 4) { w = sw/2; h = sh/2; l = (i%2)*w; t = Math.floor(i/2)*h; }
+            else if (count === 6) { w = sw/3; h = sh/2; l = (i%3)*w; t = Math.floor(i/3)*h; }
+            win.style.width = w+'px'; win.style.height = h+'px'; win.style.left = l+'px'; win.style.top = t+'px';
+        });
+        toggleSidebar();
+    }
+
+    // コメント受信
+    window.addEventListener("message", (event) => {
+        if (event.data && event.data.type === "FROM_EXTENSION") {
+            const data = event.data.data;
+            const win = document.querySelector(`[data-video-id="${data.videoId}"]`);
+            if (win && win.querySelector('.cfg-show').checked) {
+                const canvas = win.querySelector('.comment-canvas');
+                const el = document.createElement('div');
+                el.className = 'comment-text';
+                el.innerHTML = data.text;
+                const size = win.querySelector('.cfg-size')?.value || 24;
+                const speed = win.querySelector('.cfg-speed')?.value || 10;
+                const duration = (22 - speed) * 800;
+                el.style.fontSize = size + 'px';
+                el.style.top = Math.random() * 80 + '%';
+                el.style.left = '100%';
+                canvas.appendChild(el);
+                const startTime = performance.now();
+                function animate(time) {
+                    const progress = (time - startTime) / duration;
+                    el.style.transform = `translateX(-${(win.offsetWidth + 800) * progress}px)`;
+                    if (progress < 1) requestAnimationFrame(animate); else el.remove();
+                }
+                requestAnimationFrame(animate);
+            }
+        }
+    });
+
     initMemberList();
 </script>
 </body>
