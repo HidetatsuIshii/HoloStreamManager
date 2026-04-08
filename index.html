@@ -71,6 +71,13 @@
             position: absolute; white-space: nowrap; font-weight: bold;
             color: white; text-shadow: 2px 2px 2px #000, -1px -1px 0 #000;
             pointer-events: none; will-change: transform;
+            display: flex; align-items: center;
+        }
+        /* 絵文字のサイズ調整用 */
+        .youtube-emoji {
+            height: 1.2em;
+            margin: 0 2px;
+            vertical-align: middle;
         }
 
         button {
@@ -109,26 +116,24 @@
 
 <script>
     let hideTimer;
-    // --- 新設：コメント管理用変数 ---
     let commentQueue = [];
     let isProcessingQueue = false;
 
-    // --- メッセージ受信（receiver.jsからのバケツリレー） ---
+    // --- メッセージ受信 ---
     window.addEventListener("message", (event) => {
         if (event.data && event.data.type === "FROM_EXTENSION") {
             const { videoId, text } = event.data.data;
             
-            // 直接表示せずキューに追加
+            // 受信したデータをキューに追加（絵文字タグも含まれる）
             commentQueue.push({ videoId, text });
             
-            // キューの処理が動いていなければ開始
             if (!isProcessingQueue) {
                 processQueue();
             }
         }
     });
 
-    // --- 新設：キューを順番に処理する関数 ---
+    // --- キューを順番に処理する関数（高速ラグ解消版） ---
     async function processQueue() {
         if (commentQueue.length === 0) {
             isProcessingQueue = false;
@@ -137,25 +142,19 @@
 
         isProcessingQueue = true;
 
-        // キューから先頭のメッセージを取り出す
         const { videoId, text } = commentQueue.shift();
 
-        // 対象のコンテナを探す
         const targetContainer = Array.from(document.querySelectorAll('.video-container'))
             .find(c => c.dataset.videoId === videoId);
         
         if (targetContainer) {
             const overlay = targetContainer.querySelector('.comment-canvas');
+            // innerHTMLで渡すことで絵文字タグをレンダリングさせる
             createComment(overlay, text);
         }
 
-        // 次のメッセージを表示するまでの待機時間を計算
-        // 溜まっている数が多いほど、表示間隔を短くして消化を早める
-        let delay = 1200; // 基本 1.2秒おき
-        if (commentQueue.length > 20) delay = 100; // 20件以上なら 0.1秒おき
-        else if (commentQueue.length > 10) delay = 300; // 10件以上なら 0.3秒おき
-        else if (commentQueue.length > 5) delay = 600;  // 5件以上なら 0.6秒おき
-
+        // ラグを減らすため、溜まっている場合は超高速(10ms)、通常でも0.1秒(100ms)で回す
+        let delay = commentQueue.length > 10 ? 10 : 100;
         setTimeout(processQueue, delay);
     }
 
@@ -217,17 +216,17 @@
             grid.appendChild(container);
         });
 
-        // 以前のキューをクリア
         commentQueue = [];
-        
         window.postMessage({ type: "START_POLLING_REQUEST", videoIds: ids }, "*");
         sidebar.classList.remove('active');
     }
 
-    function createComment(container, text) {
+    function createComment(container, content) {
         const el = document.createElement('div');
         el.className = 'comment-text';
-        el.innerText = text;
+        
+        // innerHTMLを使用（<img>タグによる絵文字表示に対応）
+        el.innerHTML = content;
 
         const size = document.getElementById('cfg-size').value;
         const speed = document.getElementById('cfg-speed').value;
@@ -238,14 +237,12 @@
         el.style.left = '100%';
         container.appendChild(el);
 
-        // 基本の速さに少しだけランダム性を加えて、重なりを軽減
         const baseDuration = parseFloat(speed) * 1000;
         const duration = baseDuration + (Math.random() * 500);
         const startTime = performance.now();
 
         function animate(time) {
             const progress = (time - startTime) / duration;
-            // 画面の端から端まで移動
             el.style.transform = `translateX(-${(100 + 150) * progress}vw)`;
 
             if (progress < 1) {
