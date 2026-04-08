@@ -36,7 +36,6 @@
             box-sizing: border-box; font-family: monospace; font-size: 11px;
         }
 
-        /* 配信管理リスト */
         #stream-manager { margin-top: 20px; flex: 1; overflow-y: auto; }
         .stream-item {
             background: #222; margin-bottom: 5px; padding: 8px;
@@ -45,7 +44,7 @@
         }
         .stream-item.pinned { border-left-color: var(--accent); background: #2a2a2a; }
 
-        /* ビデオウィンドウ（ヘッダーなし） */
+        /* ビデオウィンドウ */
         .video-window {
             position: absolute; width: 480px; height: 270px;
             background: #000; border: 2px solid #333;
@@ -58,17 +57,16 @@
         .video-content { flex: 1; position: relative; width: 100%; height: 100%; }
         iframe.main-video { width: 100%; height: 100%; border: none; }
         
-        /* ドラッグ用透明カバー（ダブルクリックで操作切り替え） */
         .drag-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            z-index: 10; cursor: move;
+            z-index: 10; cursor: move; background: rgba(255,255,255,0);
         }
         .video-window.interacting .drag-overlay { pointer-events: none; opacity: 0; }
 
-        /* 個別設定パネル（左上配置・小型化） */
+        /* 個別設定パネル（左上・小型化） */
         .individual-config {
             position: absolute; top: 5px; left: 5px;
-            background: rgba(0,0,0,0.8); padding: 6px; border-radius: 4px;
+            background: rgba(0,0,0,0.85); padding: 6px; border-radius: 4px;
             display: none; z-index: 200; font-size: 9px; width: 100px;
             border: 1px solid #444; transform: scale(0.9); transform-origin: top left;
         }
@@ -92,13 +90,14 @@
         <button class="apply-btn" onclick="applyStreams()">キャンバスに展開</button>
         
         <div id="stream-manager">
-            <p style="font-size: 10px; color: #666; border-bottom: 1px solid #333; padding-bottom: 5px;">ACTIVE STREAMS</p>
+            <p style="font-size: 10px; color: #666; border-bottom: 1px solid #333; padding-bottom: 5px; margin-top: 15px;">ACTIVE STREAMS</p>
             <div id="stream-list"></div>
         </div>
 
-        <div style="font-size:9px; color:#555; margin-top: 10px;">
-            ※動画内操作：枠外をクリックで移動モード解除<br>
-            ※右クリック：最背面へ
+        <div style="font-size:9px; color:#555; margin-top: auto; padding-top: 10px;">
+            ・ダブルクリック：動画操作モード<br>
+            ・枠外クリック：移動モード復帰<br>
+            ・右クリック：最背面へ送る
         </div>
     </div>
 </div>
@@ -137,7 +136,7 @@
 
         const size = win.querySelector('.cfg-size').value;
         const speedVal = win.querySelector('.cfg-speed').value;
-        // 速度ロジック調整: 右にいくほど速く(durationが短く)なる。15秒〜2秒の間で可変
+        // 速度：右にいくほど早くなる。 duration 15s(速度2) 〜 2s(速度15)
         const duration = (17 - speedVal) * 1000;
 
         const el = document.createElement('div');
@@ -166,7 +165,8 @@
     }
 
     function applyStreams() {
-        const ids = document.getElementById('url-list').value.split(/\s+/).map(url => {
+        const input = document.getElementById('url-list').value;
+        const ids = input.split(/\s+/).map(url => {
             const m = url.match(/(?:v=|\/)([0-9A-Za-z_-]{11})/);
             return m ? m[1] : null;
         }).filter(id => id);
@@ -205,7 +205,6 @@
 
         const overlay = win.querySelector('.drag-overlay');
 
-        // ドラッグ移動の実装（オーバーレイ上での操作）
         overlay.onmousedown = (e) => {
             if (win.dataset.pinned !== "true") win.style.zIndex = windowZIndex++;
             let shiftX = e.clientX - win.getBoundingClientRect().left;
@@ -224,13 +223,12 @@
             };
         };
 
-        // ダブルクリックで動画を直接操作モードに
         overlay.ondblclick = () => {
             win.classList.add('interacting');
-            win.style.borderColor = var(--accent);
+            win.style.borderColor = "var(--accent)"; // 修正：クォーテーションを追加
         };
 
-        // 枠外をクリックしたら操作モード終了、移動モードへ
+        // 枠外クリックで操作終了
         window.addEventListener('mousedown', (e) => {
             if (!win.contains(e.target)) {
                 win.classList.remove('interacting');
@@ -269,14 +267,15 @@
     function togglePin(id) {
         const win = document.querySelector(`[data-video-id="${id}"]`);
         const isPinned = win.dataset.pinned === "true";
-        win.dataset.pinned = !isPinned;
+        win.dataset.pinned = isPinned ? "false" : "true";
         win.style.zIndex = isPinned ? windowZIndex++ : 9000;
         win.style.borderColor = isPinned ? "#333" : "var(--accent)";
         updateStreamList();
     }
 
     function removeStream(id) {
-        document.querySelector(`[data-video-id="${id}"]`).remove();
+        const target = document.querySelector(`[data-video-id="${id}"]`);
+        if (target) target.remove();
         if (document.querySelectorAll('.video-window').length === 0) sidebar.classList.add('empty');
         updateStreamList();
     }
