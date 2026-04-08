@@ -148,6 +148,18 @@
         updateStreamList();
     }
 
+    function togglePlay(id) {
+        const win = document.querySelector(`[data-video-id="${id}"]`);
+        const btn = win.querySelector('.play-pause-btn');
+        if (btn.innerText === '▶') {
+            sendCommand(id, 'playVideo');
+            btn.innerText = 'Ⅱ';
+        } else {
+            sendCommand(id, 'pauseVideo');
+            btn.innerText = '▶';
+        }
+    }
+
     function createVideoWindow(id, index) {
         const win = document.createElement('div');
         win.className = 'video-window';
@@ -160,8 +172,7 @@
             <div class="individual-config">
                 <div class="config-row">
                     <div style="display:flex; gap:5px; margin-bottom:5px;">
-                        <button onclick="sendCommand('${id}', 'playVideo')" title="再生">▶</button>
-                        <button onclick="sendCommand('${id}', 'pauseVideo')" title="一時停止">Ⅱ</button>
+                        <button class="play-pause-btn" onclick="togglePlay('${id}')">▶</button>
                         <button onclick="sendCommand('${id}', 'mute')" title="ミュート">M</button>
                         <button onclick="sendCommand('${id}', 'unMute')" title="解除">U</button>
                         <button onclick="location.reload()" title="再読み込み" style="background:#222">R</button>
@@ -348,6 +359,21 @@
 
     // コメント受信：innerHTMLを使用して絵文字を復活
     window.addEventListener("message", (event) => {
+        try {
+                const msg = JSON.parse(event.data);
+                if (msg.event === 'infoDelivery' && msg.info && msg.info.playerState !== undefined) {
+                    // 動画IDを特定（iframeのsrcなどから）
+                    const frames = document.querySelectorAll('iframe.main-video');
+                    frames.forEach(frame => {
+                        if (frame.contentWindow === event.source) {
+                            const win = frame.closest('.video-window');
+                            const btn = win.querySelector('.play-pause-btn');
+                            // 1 = 再生中, 2 = 一時停止中
+                            btn.innerText = (msg.info.playerState === 1) ? 'Ⅱ' : '▶';
+                        }
+                    });
+                }
+            } catch(e) {}
         if (event.data && event.data.type === "FROM_EXTENSION") {
             const data = event.data.data;
             const win = document.querySelector(`[data-video-id="${data.videoId}"]`);
