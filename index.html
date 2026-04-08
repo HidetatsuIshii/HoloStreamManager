@@ -73,7 +73,7 @@
             pointer-events: none; will-change: transform;
             display: flex; align-items: center;
         }
-        /* 絵文字のサイズ調整用 */
+        
         .youtube-emoji {
             height: 1.2em;
             margin: 0 2px;
@@ -119,21 +119,21 @@
     let commentQueue = [];
     let isProcessingQueue = false;
 
+    // --- 重なり防止用の管理変数 ---
+    const LANE_COUNT = 12; // 画面を12個のレーンに分割
+    let lastUsedLanes = []; // 直近で使用したレーンを保持
+
     // --- メッセージ受信 ---
     window.addEventListener("message", (event) => {
         if (event.data && event.data.type === "FROM_EXTENSION") {
             const { videoId, text } = event.data.data;
-            
-            // 受信したデータをキューに追加（絵文字タグも含まれる）
             commentQueue.push({ videoId, text });
-            
             if (!isProcessingQueue) {
                 processQueue();
             }
         }
     });
 
-    // --- キューを順番に処理する関数（高速ラグ解消版） ---
     async function processQueue() {
         if (commentQueue.length === 0) {
             isProcessingQueue = false;
@@ -141,7 +141,6 @@
         }
 
         isProcessingQueue = true;
-
         const { videoId, text } = commentQueue.shift();
 
         const targetContainer = Array.from(document.querySelectorAll('.video-container'))
@@ -149,11 +148,9 @@
         
         if (targetContainer) {
             const overlay = targetContainer.querySelector('.comment-canvas');
-            // innerHTMLで渡すことで絵文字タグをレンダリングさせる
             createComment(overlay, text);
         }
 
-        // ラグを減らすため、溜まっている場合は超高速(10ms)、通常でも0.1秒(100ms)で回す
         let delay = commentQueue.length > 10 ? 10 : 100;
         setTimeout(processQueue, delay);
     }
@@ -224,25 +221,44 @@
     function createComment(container, content) {
         const el = document.createElement('div');
         el.className = 'comment-text';
-        
-        // innerHTMLを使用（<img>タグによる絵文字表示に対応）
         el.innerHTML = content;
 
         const size = document.getElementById('cfg-size').value;
         const speed = document.getElementById('cfg-speed').value;
         const range = document.getElementById('cfg-range').value;
 
+        // --- レーン選択ロジック ---
+        const availableLanes = [];
+        for (let i = 0; i < LANE_COUNT; i++) {
+            if (!lastUsedLanes.includes(i)) {
+                availableLanes.push(i);
+            }
+        }
+
+        if (availableLanes.length === 0) {
+            lastUsedLanes = [];
+            for (let i = 0; i < LANE_COUNT; i++) availableLanes.push(i);
+        }
+
+        const laneIndex = availableLanes[Math.floor(Math.random() * availableLanes.length)];
+        lastUsedLanes.push(laneIndex);
+        if (lastUsedLanes.length > 4) lastUsedLanes.shift(); // 直近4つを回避
+
+        const topPosition = (laneIndex * (range / LANE_COUNT));
+
         el.style.fontSize = size + 'px';
-        el.style.top = Math.random() * range + '%';
+        el.style.top = topPosition + '%';
         el.style.left = '100%';
         container.appendChild(el);
 
+        // 速度に幅を持たせて追い越し/並走を防ぐ
         const baseDuration = parseFloat(speed) * 1000;
-        const duration = baseDuration + (Math.random() * 500);
+        const duration = baseDuration + (Math.random() * 1000); 
         const startTime = performance.now();
 
         function animate(time) {
             const progress = (time - startTime) / duration;
+            // 画面外から画面外へ移動
             el.style.transform = `translateX(-${(100 + 150) * progress}vw)`;
 
             if (progress < 1) {
