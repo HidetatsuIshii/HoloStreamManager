@@ -20,6 +20,20 @@
             background-size: 30px 30px;
         }
 
+        /* スパチャ用背景（半透明） */
+        .is-supa {
+            background: rgba(255, 215, 0, 0.3); /* ゴールド系の半透明 */
+            border-radius: 4px;
+            padding: 2px 8px;
+            border: 1px solid rgba(255, 215, 0, 0.5);
+        }
+        
+        /* メンバーシップ用の色（!importantで確実に適用） */
+        .is-member {
+            color: var(--member-green) !important;
+            text-shadow: 1px 1px 2px #000 !important;
+        }
+
         /* サイドバー */
         #sidebar {
             position: fixed; top: 0; left: 0; width: 280px; height: 100%;
@@ -172,7 +186,7 @@
             <div class="individual-config">
                 <div class="config-row">
                     <div style="display:flex; gap:5px; margin-bottom:5px;">
-                        <button class="play-pause-btn" onclick="togglePlay('${id}')">▶</button>
+                        <button class="play-pause-btn" onclick="togglePlay('${id}')">Ⅱ</button>
                     </div>
                     音量 <input type="range" min="0" max="100" value="50" oninput="sendCommand('${id}', 'setVolume', [this.value])" style="width:70px">
                 </div>
@@ -378,26 +392,42 @@
                 const canvas = win.querySelector('.comment-canvas');
                 const el = document.createElement('div');
                 el.className = 'comment-text';
-                if (data.isMember) {
-                    el.style.color = 'var(--member-green)';
-                    el.style.textShadow = '1px 1px 2px #000';
+                
+                // --- 判定とクラス付与 ---
+                // 拡張機能側が "isMember" や "isSupa" というキーで送っていると想定
+                if (data.isMember || data.authorType === 'MEMBER') {
+                    el.classList.add('is-member');
                 }
-                // ニコニコ動画のように重ならないようにする簡易調整（ランダム幅を広げる）
-                el.style.top = (Math.floor(Math.random() * 15) * 6) + '%';
-                // INNERHTML に修正
+                if (data.isSupa || data.purchaseAmount) {
+                    el.classList.add('is-supa');
+                }
+
                 el.innerHTML = data.text;
                 
+                // フォントサイズと速度の取得
                 const size = win.querySelector('.cfg-size').value;
-                const duration = (22 - win.querySelector('.cfg-speed').value) * 800;
+                const speedValue = win.querySelector('.cfg-speed').value;
+                const duration = (22 - speedValue) * 800;
+
                 el.style.fontSize = size + 'px';
-                el.style.top = Math.random() * 80 + '%';
+                // 高さを「行」で管理して重なりを軽減（0-14行のどこか）
+                el.style.top = (Math.floor(Math.random() * 15) * 6) + '%';
                 el.style.left = '100%';
+                
                 canvas.appendChild(el);
+
                 const startTime = performance.now();
                 function animate(time) {
                     const progress = (time - startTime) / duration;
-                    el.style.transform = `translateX(-${(win.offsetWidth + 800) * progress}px)`;
-                    if (progress < 1) requestAnimationFrame(animate); else el.remove();
+                    // 流れる距離を計算
+                    const distance = win.offsetWidth + el.offsetWidth + 200;
+                    el.style.transform = `translateX(-${distance * progress}px)`;
+                    
+                    if (progress < 1) {
+                        requestAnimationFrame(animate);
+                    } else {
+                        el.remove();
+                    }
                 }
                 requestAnimationFrame(animate);
             }
