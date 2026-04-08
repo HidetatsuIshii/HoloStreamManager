@@ -38,7 +38,7 @@
         #menu-trigger {
             position: fixed;
             top: 15px;
-            left: 15px;
+            left: 15px; /* 通常時 */
             width: 40px;
             height: 40px;
             background: var(--panel-bg);
@@ -49,8 +49,9 @@
             justify-content: center;
             align-items: center;
             cursor: pointer;
-            z-index: 50; /* 動画(100〜)より背面に配置 */
-            transition: background 0.2s;
+            /* 動画(100〜)よりは弱く、でもサイドバー(10000)よりは強く */
+            z-index: 10001; 
+            transition: transform 0.3s ease, background 0.2s;
         }
         
         #menu-trigger:hover {
@@ -62,6 +63,11 @@
             height: 2px;
             background: var(--accent);
             margin: 2px 0;
+        }
+
+        /* サイドバーが開いているとき、ボタンを右にスライドさせる */
+        #sidebar.active ~ #menu-trigger {
+            transform: translateX(275px); /* サイドバーの幅分だけ移動 */
         }
         
         /* サイドバー */
@@ -158,12 +164,6 @@
 
 <div id="global-guard"></div>
 <div id="snap-preview" class="snap-preview"></div>
-
-<div id="menu-trigger" onclick="toggleSidebar()">
-    <div class="bar"></div>
-    <div class="bar"></div>
-    <div class="bar"></div>
-</div>
     
 <div id="sidebar" class="empty">
     <div class="sidebar-content">
@@ -175,6 +175,12 @@
             <div id="stream-list"></div>
         </div>
     </div>
+</div>
+
+<div id="menu-trigger" onclick="toggleSidebar()">
+    <div class="bar"></div>
+    <div class="bar"></div>
+    <div class="bar"></div>
 </div>
 
 <div id="canvas" onclick="handleCanvasClick(event)"></div>
