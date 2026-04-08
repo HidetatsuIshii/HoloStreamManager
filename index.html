@@ -2,15 +2,14 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>HoloStreamer Pro - Dynamic Layout & Live Chat</title>
+    <title>HoloStreamer Pro - Multi-Color SC</title>
     <style>
         :root {
             --bg-dark: #000000;
             --panel-bg: rgba(20, 20, 20, 0.95);
             --accent: #00d4ff;
             --text: #e0e0e0;
-            --member-green: #2ba640; /* メンバーシップカラー */
-            --sc-gold: #ffd700;      /* スパチャカラー */
+            --member-green: #2ba640;
         }
 
         body, html {
@@ -20,100 +19,44 @@
         }
 
         #sidebar {
-            position: fixed;
-            top: 0; left: 0;
-            width: 300px; height: 100%;
-            background: var(--panel-bg);
-            border-right: 1px solid #333;
-            z-index: 1000;
-            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            transform: translateX(-290px);
+            position: fixed; top: 0; left: 0; width: 300px; height: 100%;
+            background: var(--panel-bg); border-right: 1px solid #333;
+            z-index: 1000; transition: transform 0.4s; transform: translateX(-290px);
         }
-
-        #sidebar:hover, #sidebar.active {
-            transform: translateX(0);
-        }
-
+        #sidebar:hover, #sidebar.active { transform: translateX(0); }
         .sidebar-content { padding: 20px; }
-        h2 { font-size: 1.1rem; color: var(--accent); margin-top: 0; }
-
-        textarea {
-            width: 100%; height: 120px;
-            background: #1e1e1e; color: #fff; border: 1px solid #444;
-            border-radius: 4px; padding: 10px; box-sizing: border-box;
-            font-family: monospace; font-size: 12px;
-        }
-
-        .hint { font-size: 0.7rem; opacity: 0.6; margin: 10px 0; }
-
-        #main-view {
-            width: 100vw; height: 100vh;
-            display: flex; align-items: center; justify-content: center;
-        }
-        
-        #video-grid {
-            width: 100%; height: 100%;
-            display: grid;
-            gap: 2px;
-            background: #000;
-        }
-
-        .video-container {
-            position: relative; width: 100%; height: 100%;
-            background: #000; overflow: hidden;
-        }
-
+        textarea { width: 100%; height: 120px; background: #1e1e1e; color: #fff; border: 1px solid #444; border-radius: 4px; padding: 10px; box-sizing: border-box; }
+        #main-view { width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; }
+        #video-grid { width: 100%; height: 100%; display: grid; gap: 2px; background: #000; }
+        .video-container { position: relative; width: 100%; height: 100%; background: #000; overflow: hidden; }
         iframe { width: 100%; height: 100%; border: none; }
+        .comment-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100; }
 
-        .comment-canvas {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none; z-index: 100;
-        }
-
-        /* --- コメントの基本スタイル --- */
         .comment-text {
             position: absolute; white-space: nowrap; font-weight: 900;
             color: white; text-shadow: 2px 2px 2px #000, -1px -1px 0 #000;
             pointer-events: none; will-change: transform;
             display: flex; align-items: center;
-            padding: 2px 8px;
-            border-radius: 4px;
+            padding: 2px 10px; border-radius: 6px;
         }
 
-        /* --- メンバー限定スタイル --- */
-        .comment-text.member {
-            color: var(--member-green);
-        }
+        .comment-text.member { color: var(--member-green); }
 
-        /* --- スーパーチャット限定スタイル --- */
         .comment-text.super-chat {
-            background: rgba(255, 215, 0, 0.15); /* 金色の薄い背景 */
-            border: 2px solid var(--sc-gold);
-            z-index: 150; /* スパチャを最前面に */
+            z-index: 150;
+            /* 背景は色付き、枠はさらに強調 */
+            background: rgba(0, 0, 0, 0.4);
+            border: 3px solid transparent; 
         }
         
         .sc-amount {
-            background: var(--sc-gold);
-            color: #000;
-            padding: 0 6px;
-            border-radius: 4px;
-            margin-right: 8px;
-            font-size: 0.85em;
-            font-weight: bold;
-            text-shadow: none; /* 金額は見やすく */
+            color: #000; padding: 1px 6px; border-radius: 4px;
+            margin-right: 8px; font-size: 0.85em; font-weight: bold;
+            text-shadow: none;
         }
 
-        .youtube-emoji {
-            height: 1.2em;
-            margin: 0 2px;
-            vertical-align: middle;
-        }
-
-        button {
-            width: 100%; padding: 10px; background: var(--accent); border: none;
-            color: #000; font-weight: bold; border-radius: 4px; cursor: pointer;
-            margin-top: 10px;
-        }
+        .youtube-emoji { height: 1.2em; margin: 0 2px; vertical-align: middle; }
+        button { width: 100%; padding: 10px; background: var(--accent); border: none; font-weight: bold; border-radius: 4px; cursor: pointer; margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -121,141 +64,50 @@
 <div id="sidebar">
     <div class="sidebar-content">
         <h2>HoloStreamer Pro</h2>
-        <textarea id="url-list" placeholder="YouTube URLを入力..."></textarea>
-        <p class="hint">マウスを左端に寄せると表示されます</p>
-        <button onclick="applyStreams()">適用して全画面表示</button>
-        
+        <textarea id="url-list" placeholder="YouTube URL..."></textarea>
+        <button onclick="applyStreams()">適用</button>
         <div style="margin-top:20px;">
-            <label style="font-size: 12px;">文字サイズ</label>
-            <input type="range" id="cfg-size" min="16" max="60" value="32" style="width:100%">
-            
-            <label style="font-size: 12px; margin-top:10px; display:block;">流れるスピード (秒)</label>
-            <input type="range" id="cfg-speed" min="2" max="15" value="6" step="1" style="width:100%">
-            <span style="font-size:10px;">※短いほど速い</span>
-        
-            <label style="font-size: 12px; margin-top:10px; display:block;">出現範囲（縦）</label>
-            <input type="range" id="cfg-range" min="10" max="95" value="80" style="width:100%">
+            <label style="font-size:12px;">文字サイズ</label><input type="range" id="cfg-size" min="16" max="60" value="32" style="width:100%">
+            <label style="font-size:12px;">スピード</label><input type="range" id="cfg-speed" min="2" max="15" value="6" style="width:100%">
+            <label style="font-size:12px;">範囲</label><input type="range" id="cfg-range" min="10" max="95" value="80" style="width:100%">
         </div>
     </div>
 </div>
 
-<div id="main-view">
-    <div id="video-grid"></div>
-</div>
+<div id="main-view"><div id="video-grid"></div></div>
 
 <script>
-    let hideTimer;
     let commentQueue = [];
     let isProcessingQueue = false;
-
-    const LANE_COUNT = 15; // レーン数を少し増やして分散を強化
+    const LANE_COUNT = 15;
     let lastUsedLanes = [];
 
-    // --- メッセージ受信 ---
     window.addEventListener("message", (event) => {
         if (event.data && event.data.type === "FROM_EXTENSION") {
-            // 受信データ: { videoId, text, type, amount }
             commentQueue.push(event.data.data);
-            if (!isProcessingQueue) {
-                processQueue();
-            }
+            if (!isProcessingQueue) processQueue();
         }
     });
 
     async function processQueue() {
-        if (commentQueue.length === 0) {
-            isProcessingQueue = false;
-            return;
-        }
-
+        if (commentQueue.length === 0) { isProcessingQueue = false; return; }
         isProcessingQueue = true;
         const data = commentQueue.shift();
-
-        const targetContainer = Array.from(document.querySelectorAll('.video-container'))
-            .find(c => c.dataset.videoId === data.videoId);
-        
-        if (targetContainer) {
-            const overlay = targetContainer.querySelector('.comment-canvas');
-            createComment(overlay, data);
-        }
-
-        // 大量コメント時のラグ対策
-        let delay = commentQueue.length > 15 ? 5 : 80;
-        setTimeout(processQueue, delay);
-    }
-
-    const sidebar = document.getElementById('sidebar');
-    sidebar.addEventListener('mousemove', () => {
-        sidebar.classList.add('active');
-        clearTimeout(hideTimer);
-        hideTimer = setTimeout(() => {
-            sidebar.classList.remove('active');
-        }, 3000);
-    });
-
-    function getYouTubeId(url) {
-        const reg = /(?:v=|\/)([0-9A-Za-z_-]{11})/;
-        const m = url.match(reg);
-        return m ? m[1] : null;
-    }
-
-    function setupLayout(count) {
-        const grid = document.getElementById('video-grid');
-        let cols, rows;
-
-        if (count === 1) { cols = 1; rows = 1; }
-        else if (count === 2) { cols = 2; rows = 1; }
-        else if (count <= 4) { cols = 2; rows = 2; }
-        else if (count <= 6) { cols = 3; rows = 2; }
-        else {
-            cols = Math.ceil(Math.sqrt(count));
-            rows = Math.ceil(count / cols);
-        }
-
-        grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-        grid.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
-    }
-
-    async function applyStreams() {
-        const textInput = document.getElementById('url-list').value;
-        const ids = textInput.split(/\s+/).map(getYouTubeId).filter(id => id);
-        const grid = document.getElementById('video-grid');
-        grid.innerHTML = '';
-
-        if (ids.length === 0) return;
-
-        setupLayout(ids.length);
-
-        ids.forEach(id => {
-            const container = document.createElement('div');
-            container.className = 'video-container';
-            container.dataset.videoId = id;
-            
-            const iframe = document.createElement('iframe');
-            iframe.src = `https://www.youtube.com/embed/${id}?autoplay=1&mute=1`;
-            
-            const overlay = document.createElement('div');
-            overlay.className = 'comment-canvas';
-            
-            container.appendChild(iframe);
-            container.appendChild(overlay);
-            grid.appendChild(container);
-        });
-
-        commentQueue = [];
-        window.postMessage({ type: "START_POLLING_REQUEST", videoIds: ids }, "*");
-        sidebar.classList.remove('active');
+        const container = Array.from(document.querySelectorAll('.video-container')).find(c => c.dataset.videoId === data.videoId);
+        if (container) createComment(container.querySelector('.comment-canvas'), data);
+        setTimeout(processQueue, commentQueue.length > 20 ? 5 : 50);
     }
 
     function createComment(container, data) {
         const el = document.createElement('div');
-        // クラス名を付与 (normal, member, super-chat)
         el.className = `comment-text ${data.type}`;
 
         let html = "";
-        // スパチャなら金額バッジを先頭に追加
-        if (data.type === 'super-chat' && data.amount) {
-            html += `<span class="sc-amount">${data.amount}</span>`;
+        if (data.type === 'super-chat') {
+            // スパチャの色設定を適用
+            el.style.borderColor = data.color;
+            el.style.backgroundColor = `${data.color}33`; // 20%の透過
+            html += `<span class="sc-amount" style="background-color: ${data.color}">${data.amount}</span>`;
         }
         html += data.text;
         el.innerHTML = html;
@@ -264,45 +116,47 @@
         const speed = document.getElementById('cfg-speed').value;
         const range = document.getElementById('cfg-range').value;
 
-        // --- レーン選択 ---
         const availableLanes = [];
-        for (let i = 0; i < LANE_COUNT; i++) {
-            if (!lastUsedLanes.includes(i)) availableLanes.push(i);
-        }
-
-        if (availableLanes.length === 0) {
-            lastUsedLanes = [];
-            for (let i = 0; i < LANE_COUNT; i++) availableLanes.push(i);
-        }
-
+        for (let i = 0; i < LANE_COUNT; i++) if (!lastUsedLanes.includes(i)) availableLanes.push(i);
+        if (availableLanes.length === 0) { lastUsedLanes = []; for (let i = 0; i < LANE_COUNT; i++) availableLanes.push(i); }
         const laneIndex = availableLanes[Math.floor(Math.random() * availableLanes.length)];
         lastUsedLanes.push(laneIndex);
         if (lastUsedLanes.length > 5) lastUsedLanes.shift();
 
-        const topPosition = (laneIndex * (range / LANE_COUNT));
-
         el.style.fontSize = size + 'px';
-        el.style.top = topPosition + '%';
+        el.style.top = (laneIndex * (range / LANE_COUNT)) + '%';
         el.style.left = '100%';
         container.appendChild(el);
 
-        const baseDuration = parseFloat(speed) * 1000;
-        const duration = baseDuration + (Math.random() * 1000); 
+        const duration = (parseFloat(speed) * 1000) + (Math.random() * 1000);
         const startTime = performance.now();
 
         function animate(time) {
             const progress = (time - startTime) / duration;
             el.style.transform = `translateX(-${(100 + 150) * progress}vw)`;
-
-            if (progress < 1) {
-                requestAnimationFrame(animate);
-            } else {
-                el.remove();
-            }
+            if (progress < 1) requestAnimationFrame(animate); else el.remove();
         }
         requestAnimationFrame(animate);
     }
-</script>
 
+    function getYouTubeId(url) { const m = url.match(/(?:v=|\/)([0-9A-Za-z_-]{11})/); return m ? m[1] : null; }
+    function applyStreams() {
+        const ids = document.getElementById('url-list').value.split(/\s+/).map(getYouTubeId).filter(id => id);
+        const grid = document.getElementById('video-grid');
+        grid.innerHTML = '';
+        if (ids.length === 0) return;
+        let cols = Math.ceil(Math.sqrt(ids.length)), rows = Math.ceil(ids.length / cols);
+        grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+        grid.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+        ids.forEach(id => {
+            const div = document.createElement('div');
+            div.className = 'video-container';
+            div.dataset.videoId = id;
+            div.innerHTML = `<iframe src="https://www.youtube.com/embed/${id}?autoplay=1&mute=1"></iframe><div class="comment-canvas"></div>`;
+            grid.appendChild(div);
+        });
+        window.postMessage({ type: "START_POLLING_REQUEST", videoIds: ids }, "*");
+    }
+</script>
 </body>
 </html>
