@@ -109,22 +109,55 @@
 
 <script>
     let hideTimer;
+    // --- 新設：コメント管理用変数 ---
+    let commentQueue = [];
+    let isProcessingQueue = false;
 
     // --- メッセージ受信（receiver.jsからのバケツリレー） ---
     window.addEventListener("message", (event) => {
         if (event.data && event.data.type === "FROM_EXTENSION") {
             const { videoId, text } = event.data.data;
             
-            const targetContainer = Array.from(document.querySelectorAll('.video-container'))
-                .find(c => c.dataset.videoId === videoId);
+            // 直接表示せずキューに追加
+            commentQueue.push({ videoId, text });
             
-            if (targetContainer) {
-                const overlay = targetContainer.querySelector('.comment-canvas');
-                // テキストのみを表示（ユーザー名は含めない）
-                createComment(overlay, text);
+            // キューの処理が動いていなければ開始
+            if (!isProcessingQueue) {
+                processQueue();
             }
         }
     });
+
+    // --- 新設：キューを順番に処理する関数 ---
+    async function processQueue() {
+        if (commentQueue.length === 0) {
+            isProcessingQueue = false;
+            return;
+        }
+
+        isProcessingQueue = true;
+
+        // キューから先頭のメッセージを取り出す
+        const { videoId, text } = commentQueue.shift();
+
+        // 対象のコンテナを探す
+        const targetContainer = Array.from(document.querySelectorAll('.video-container'))
+            .find(c => c.dataset.videoId === videoId);
+        
+        if (targetContainer) {
+            const overlay = targetContainer.querySelector('.comment-canvas');
+            createComment(overlay, text);
+        }
+
+        // 次のメッセージを表示するまでの待機時間を計算
+        // 溜まっている数が多いほど、表示間隔を短くして消化を早める
+        let delay = 1200; // 基本 1.2秒おき
+        if (commentQueue.length > 20) delay = 100; // 20件以上なら 0.1秒おき
+        else if (commentQueue.length > 10) delay = 300; // 10件以上なら 0.3秒おき
+        else if (commentQueue.length > 5) delay = 600;  // 5件以上なら 0.6秒おき
+
+        setTimeout(processQueue, delay);
+    }
 
     const sidebar = document.getElementById('sidebar');
     sidebar.addEventListener('mousemove', () => {
@@ -184,13 +217,10 @@
             grid.appendChild(container);
         });
 
-        // 拡張機能のbackground.jsへ「この動画のチャット取得を開始せよ」と命令
-        // receiver.js経由ではなく、ページ上のスクリプトから直接送信を試みる（権限があれば）
-        // もし動かなければ、ここはreceiver.js側に転送ロジックが必要ですが、
-        // 一般的には以下のchrome.runtime.sendMessageは拡張機能ドメインでないと失敗します。
-        // なので、今回は window.postMessage で receiver.js に「取得開始」を伝えます。
+        // 以前のキューをクリア
+        commentQueue = [];
+        
         window.postMessage({ type: "START_POLLING_REQUEST", videoIds: ids }, "*");
-
         sidebar.classList.remove('active');
     }
 
@@ -208,11 +238,14 @@
         el.style.left = '100%';
         container.appendChild(el);
 
-        const duration = (parseFloat(speed) * 1000) + (Math.random() * 1000);
+        // 基本の速さに少しだけランダム性を加えて、重なりを軽減
+        const baseDuration = parseFloat(speed) * 1000;
+        const duration = baseDuration + (Math.random() * 500);
         const startTime = performance.now();
 
         function animate(time) {
             const progress = (time - startTime) / duration;
+            // 画面の端から端まで移動
             el.style.transform = `translateX(-${(100 + 150) * progress}vw)`;
 
             if (progress < 1) {
