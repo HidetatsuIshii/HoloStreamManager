@@ -408,13 +408,16 @@
                 // --- 判定ロジックの強化 ---
                 // 拡張機能によってプロパティ名が異なるため、代表的なものを網羅
                 const isMember = data.isMember || 
+                                 data.type === 'member' ||  // ← これを追加
                                  data.authorType === 'member' || 
+                                 data.authorType === 'MEMBER' || // 大文字もカバー
                                  data.membership === true || 
                                  (data.badge && data.badge.includes('member'));
-        
+
                 const isSupa = data.isSupa || 
                                data.purchaseAmount || 
-                               data.type === 'superchat';
+                               data.type === 'superchat' ||
+                               data.type === 'super-chat';
         
                 if (isMember) {
                     el.classList.add('is-member');
