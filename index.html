@@ -118,6 +118,7 @@
             display: flex; flex-direction: column;
             overflow: hidden; min-width: 200px; min-height: 120px;
             transition: width 0.15s, height 0.15s, left 0.15s, top 0.15s, border-color 0.2s;
+            max-width: 100vw; max-height: 100vh;
         }
         .video-window.moving { transition: none; } /* 移動・リサイズ中はアニメオフ */
 
@@ -563,6 +564,40 @@
         }
         updateStreamList();
     }
+
+    // リサイズ追従用の変数
+    let lastWindowWidth = window.innerWidth;
+    let lastWindowHeight = window.innerHeight;
+    
+    window.addEventListener('resize', () => {
+        const newWidth = window.innerWidth;
+        const newHeight = window.innerHeight;
+    
+        // 倍率を計算
+        const scaleX = newWidth / lastWindowWidth;
+        const scaleY = newHeight / lastWindowHeight;
+    
+        // 全ての動画ウィンドウを走査して位置とサイズを更新
+        document.querySelectorAll('.video-window').forEach(win => {
+            const rect = win.getBoundingClientRect();
+    
+            // 新しい位置とサイズを計算
+            const nextLeft = rect.left * scaleX;
+            const nextTop = rect.top * scaleY;
+            const nextWidth = rect.width * scaleX;
+            const nextHeight = rect.height * scaleY;
+    
+            // 最小サイズ（200x120）を下回らないように適用
+            win.style.left = nextLeft + 'px';
+            win.style.top = nextTop + 'px';
+            win.style.width = Math.max(200, nextWidth) + 'px';
+            win.style.height = Math.max(120, nextHeight) + 'px';
+        });
+    
+        // 現在のサイズを保存
+        lastWindowWidth = newWidth;
+        lastWindowHeight = newHeight;
+    });
 
     // コメント受信：innerHTMLを使用して絵文字を復活
     window.addEventListener("message", (event) => {
