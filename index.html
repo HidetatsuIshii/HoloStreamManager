@@ -522,25 +522,31 @@
             document.addEventListener('mouseup', onUp);
         };
 
-        // --- 右クリックをiframeに貫通させる ---
+        // --- 右クリック：元通り禁止（最前面へ移動させるだけ） ---
         overlay.oncontextmenu = (e) => {
-            // 1. 一時的にオーバーレイのクリック判定を無効化
-            overlay.style.pointerEvents = 'none';
-        
-            // 2. 0.1秒後（右クリックメニューが出た頃）に判定を元に戻す
-            setTimeout(() => {
-                overlay.style.pointerEvents = 'auto';
-            }, 100);
-            
-            // ここで preventDefault をしないことで、iframeの中（YouTube）に右クリックが届くようになります
+            e.preventDefault(); 
+            win.style.zIndex = windowZIndex++;
         };
-
-        overlay.ondblclick = () => win.classList.add('interacting');
+        
+        // --- ダブルクリック：操作モード（YouTubeメニューへのアクセス）を開放 ---
+        overlay.ondblclick = () => {
+            win.classList.add('interacting');
+            // ヒント：操作モードになったことがわかるようにボーダーの色を変えるのもアリです
+        };
+        
+        // ウィンドウの外をクリックしたら「操作モード」を解除して「移動モード」に戻す
         window.addEventListener('mousedown', (e) => {
-            if (!win.contains(e.target)) win.classList.remove('interacting');
+            if (!win.contains(e.target)) {
+                win.classList.remove('interacting');
+            }
         });
 
-        win.oncontextmenu = () => { win.style.zIndex = windowZIndex++; };
+        // ウィンドウ全体での右クリック禁止を再有効化
+        win.oncontextmenu = (e) => {
+            e.preventDefault(); 
+            win.style.zIndex = windowZIndex++;
+        };
+        
         const iframe = win.querySelector('iframe');
         iframe.onload = () => {
             // 読み込み完了後、少し待ってから最高画質コマンドを送信
