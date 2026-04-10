@@ -141,8 +141,8 @@
         /* 統合コントロールパネル */
         .individual-config {
             position: absolute;
-            top: 35px;    /* 10pxから35pxに下げて、上側のリサイズ判定(30px)を避ける */
-            left: 35px;   /* 10pxから35pxに右へ寄せて、左側のリサイズ判定(30px)を避ける */
+            top: 25px;
+            left: 25px;
             background: rgba(0,0,0,0.95);
             padding: 10px;
             border-radius: 6px;
@@ -318,24 +318,38 @@
 
         // --- リサイズ判定の修正 ---
         win.onmousemove = (e) => {
-            // 追加：設定パネル（individual-config）の上をホバーしている時はリサイズ判定をスキップ
+            // 設定パネルの上では何もしない
             if (e.target.closest('.individual-config')) {
                 win.style.cursor = 'default';
                 return;
             }
         
             if (win.classList.contains('interacting') || isResizing) return;
+            
             const rect = win.getBoundingClientRect();
-            const hit = 30; 
+            const hit = 25; // 判定範囲を25pxに変更
             let cursor = '';
             
-            if (e.clientY - rect.top < hit) cursor += 'n';
-            else if (rect.bottom - e.clientY < hit) cursor += 's';
-            if (e.clientX - rect.left < hit) cursor += 'w';
-            else if (rect.right - e.clientX < hit) cursor += 'e';
+            // 上下左右の端から25px以内か判定
+            const isTop = (e.clientY - rect.top < hit);
+            const isBottom = (rect.bottom - e.clientY < hit);
+            const isLeft = (e.clientX - rect.left < hit);
+            const isRight = (rect.right - e.clientX < hit);
+        
+            if (isTop) cursor += 'n';
+            else if (isBottom) cursor += 's';
             
-            win.style.cursor = cursor ? cursor + '-resize' : 'default';
-            currentHandle = cursor;
+            if (isLeft) cursor += 'w';
+            else if (isRight) cursor += 'e';
+            
+            // リサイズ領域にいる場合のみカーソルを変更
+            if (cursor) {
+                win.style.cursor = cursor + '-resize';
+                currentHandle = cursor;
+            } else {
+                win.style.cursor = 'default';
+                currentHandle = '';
+            }
         };
 
         win.onmousedown = (e) => {
@@ -383,8 +397,13 @@
         const overlay = win.querySelector('.drag-overlay');
         const configPanel = win.querySelector('.individual-config');
         overlay.onmousedown = (e) => {
-            if (e.target.closest('.individual-config')) return;
+            // リサイズ領域（25px以内）や設定パネル上では移動を開始しない
+            if (win.style.cursor.includes('resize') || e.target.closest('.individual-config')) {
+                return;
+            }
+            
             if (isResizing) return;
+            
             win.classList.add('moving');
             win.style.zIndex = windowZIndex++;
             guard.style.display = 'block';
