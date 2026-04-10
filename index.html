@@ -141,19 +141,19 @@
         /* 統合コントロールパネル */
         .individual-config {
             position: absolute;
-            top: 10px;
-            left: 10px;
+            top: 35px;    /* 10pxから35pxに下げて、上側のリサイズ判定(30px)を避ける */
+            left: 35px;   /* 10pxから35pxに右へ寄せて、左側のリサイズ判定(30px)を避ける */
             background: rgba(0,0,0,0.95);
             padding: 10px;
             border-radius: 6px;
             display: none;
-            z-index: 1000; /* drag-overlay(10)より大きく */
+            z-index: 5000; /* 十分に高い値に設定して最前面へ */
             font-size: 10px;
             width: 130px;
             border: 1px solid #555;
             transform: scale(0.85);
             transform-origin: top left;
-            pointer-events: auto; /* 確実にクリックを通す */
+            pointer-events: auto; /* 確実にクリックを有効化 */
         }
         .video-window:hover .individual-config { display: block; }
         .config-row { margin-bottom: 8px; border-bottom: 1px solid #333; padding-bottom: 4px; }
@@ -316,11 +316,17 @@
         let isResizing = false;
         let currentHandle = '';
 
-        // --- リサイズ判定（広範囲：30px） ---
+        // --- リサイズ判定の修正 ---
         win.onmousemove = (e) => {
+            // 追加：設定パネル（individual-config）の上をホバーしている時はリサイズ判定をスキップ
+            if (e.target.closest('.individual-config')) {
+                win.style.cursor = 'default';
+                return;
+            }
+        
             if (win.classList.contains('interacting') || isResizing) return;
             const rect = win.getBoundingClientRect();
-            const hit = 30; // 判定範囲を大幅に拡大
+            const hit = 30; 
             let cursor = '';
             
             if (e.clientY - rect.top < hit) cursor += 'n';
