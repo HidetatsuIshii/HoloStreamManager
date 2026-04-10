@@ -522,12 +522,25 @@
             document.addEventListener('mouseup', onUp);
         };
 
+        // --- 右クリックをiframeに貫通させる ---
+        overlay.oncontextmenu = (e) => {
+            // 1. 一時的にオーバーレイのクリック判定を無効化
+            overlay.style.pointerEvents = 'none';
+        
+            // 2. 0.1秒後（右クリックメニューが出た頃）に判定を元に戻す
+            setTimeout(() => {
+                overlay.style.pointerEvents = 'auto';
+            }, 100);
+            
+            // ここで preventDefault をしないことで、iframeの中（YouTube）に右クリックが届くようになります
+        };
+
         overlay.ondblclick = () => win.classList.add('interacting');
         window.addEventListener('mousedown', (e) => {
             if (!win.contains(e.target)) win.classList.remove('interacting');
         });
 
-        win.oncontextmenu = (e) => { e.preventDefault(); win.style.zIndex = windowZIndex++; };
+        win.oncontextmenu = () => { win.style.zIndex = windowZIndex++; };
         const iframe = win.querySelector('iframe');
         iframe.onload = () => {
             // 読み込み完了後、少し待ってから最高画質コマンドを送信
