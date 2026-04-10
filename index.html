@@ -186,6 +186,7 @@
 <div id="canvas" onclick="handleCanvasClick(event)"></div>
 
 <script>
+    console.log("System Initializing..."); // これがコンソールに出るか確認
     let windowZIndex = 100;
     const guard = document.getElementById('global-guard');
 
@@ -430,7 +431,12 @@
     function removeStream(id) {
         const target = document.querySelector(`[data-video-id="${id}"]`);
         if (target) target.remove();
-        if (document.querySelectorAll('.video-window').length === 0) sidebar.classList.add('empty');
+        
+        // sidebarをその場で取得するように変更
+        const sidebar = document.getElementById('sidebar');
+        if (sidebar && document.querySelectorAll('.video-window').length === 0) {
+            sidebar.classList.add('empty');
+        }
         updateStreamList();
     }
 
