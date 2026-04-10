@@ -38,7 +38,7 @@
         #menu-trigger {
             position: fixed;
             top: 15px;
-            left: 15px; /* 通常時 */
+            left: 15px;
             width: 40px;
             height: 40px;
             background: var(--panel-bg);
@@ -49,9 +49,8 @@
             justify-content: center;
             align-items: center;
             cursor: pointer;
-            /* 動画(100〜)よりは弱く、でもサイドバー(10000)よりは強く */
             z-index: 10001; 
-            transition: transform 0.3s ease, background 0.2s;
+            transition: opacity 0.2s ease, visibility 0.2s; /* アニメーションを不透明度に変更 */
         }
         
         #menu-trigger:hover {
@@ -65,19 +64,36 @@
             margin: 2px 0;
         }
 
-        /* サイドバーが開いているとき、ボタンを右にスライドさせる */
-        #sidebar.active ~ #menu-trigger {
-            transform: translateX(275px); /* サイドバーの幅分だけ移動 */
+        /* サイドバーが active または empty (初期) のときはボタンを消す */
+        #sidebar.active ~ #menu-trigger,
+        #sidebar.empty ~ #menu-trigger {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
         }
         
-        /* サイドバー */
+        /* サイドバーの初期状態（画面外へ） */
         #sidebar {
-            position: fixed; top: 0; left: 0; width: 280px; height: 100%;
-            background: var(--panel-bg); border-right: 1px solid #444;
-            z-index: 10000; transition: transform 0.3s ease;
-            transform: translateX(-275px);
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 280px; 
+            height: 100%;
+            background: var(--panel-bg); 
+            border-right: 1px solid #444;
+            z-index: 10000; 
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); /* 動きを滑らかに */
+            transform: translateX(-100%); /* 完全に隠す */
         }
-        #sidebar.active, #sidebar.empty { transform: translateX(0); }
+        /* 表示状態 */
+        #sidebar.active { 
+            transform: translateX(0); 
+        }
+        
+        /* 初回起動時（URL入力前）もサイドバーを出しておくならここ */
+        #sidebar.empty { 
+            transform: translateX(0); 
+        }
         .sidebar-content { padding: 20px; display: flex; flex-direction: column; height: 100%; box-sizing: border-box; }
         
         textarea {
