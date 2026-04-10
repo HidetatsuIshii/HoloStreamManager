@@ -608,8 +608,9 @@
         if (!listContainer) return;
     
         const API_KEY = '65f92c6d-c919-4861-a3a6-735a7290ec4a'; 
-        // topic=hololive を追加して絞り込みを強化
-        const url = 'https://holodex.net/api/v2/live?org=Hololive&status=live&type=stream&topic=hololive';
+        
+        // 修正ポイント1: topicパラメータを削除し、確実にホロ所属メンバーを拾うように変更
+        const url = 'https://holodex.net/api/v2/live?org=Hololive&status=live&type=stream';
     
         try {
             const response = await fetch(url, {
@@ -622,20 +623,27 @@
     
             if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
             
-            let data = await response.json();
+            const rawData = await response.json();
             listContainer.innerHTML = '';
     
-            // 【修正点】念のため、所属(org)がHololiveでないものを除外するフィルタリング
-            data = data.filter(v => v.channel.org === "Hololive");
+            // 修正ポイント2: データのフィルタリングを確実に行う
+            // Holodexは稀にゲスト出演なども拾うため、チャンネル自体の所属をチェック
+            const data = rawData.filter(v => 
+                v.channel && 
+                (v.channel.org === "Hololive" || (v.channel.suborg && v.channel.suborg.includes("Hololive")))
+            );
     
             if (!data || data.length === 0) {
                 listContainer.innerHTML = '<p style="font-size: 10px; color: #666; text-align: center;">現在配信中のメンバーはいません</p>';
                 return;
             }
     
-            data.forEach(video => {
+            // 念のため、同じチャンネルの重複を排除
+            const uniqueData = Array.from(new Map(data.map(item => [item.channel.id, item])).values());
+    
+            uniqueData.forEach(video => {
                 const videoId = video.id;
-                // チャンネル名から(Hololive / ホロライブ)などの表記を削って短くする
+                // チャンネル名をきれいに成形
                 const channelName = video.channel.name.split(/[\[\(（【]/)[0].trim();
                 const title = video.title;
     
