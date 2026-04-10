@@ -208,14 +208,26 @@
 
     function handleCanvasClick(e) {
         const sidebar = document.getElementById('sidebar');
+        
+        // 1. サイドバーが表示されている場合
         if (sidebar.classList.contains('active')) {
-            sidebar.classList.remove('active');
-            return; // サイドバーを閉じるだけで終了
+            // クリックされたのがサイドバー自体でなければ閉じる
+            if (!sidebar.contains(e.target)) {
+                sidebar.classList.remove('active');
+                // サイドバーを閉じる動作を優先し、フルスクリーン切り替えは行わない
+                return;
+            }
         }
     
+        // 2. サイドバーが閉まっている状態でのキャンバスクリック（フルスクリーン制御）
         if (e.target.id === 'canvas') {
-            if (!document.fullscreenElement) document.documentElement.requestFullscreen();
-            else document.exitFullscreen();
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.log("Fullscreen Error:", err);
+                });
+            } else {
+                document.exitFullscreen();
+            }
         }
     }
 
@@ -227,6 +239,10 @@
     function toggleSidebar() {
         const sidebar = document.getElementById('sidebar');
         sidebar.classList.toggle('active');
+        // emptyクラスが付いていると消えない場合があるので、手動操作時は除去する
+        if (sidebar.classList.contains('active')) {
+            sidebar.classList.remove('empty');
+        }
     }
     
     function applyStreams() {
