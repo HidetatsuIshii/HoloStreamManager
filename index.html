@@ -164,6 +164,17 @@
 
         button { cursor: pointer; border: none; font-weight: bold; border-radius: 3px; background: #444; color: #fff; padding: 2px 6px; }
         .apply-btn { width: 100%; padding: 10px; background: var(--accent); color: #000; margin-top: 10px; }
+        
+        button.quality-btn {
+            background: #555; /* 少し色を変えて区別 */
+            color: var(--accent); /* 文字色をアクセントカラーに */
+            font-size: 9px;
+            padding: 2px 4px;
+        }
+        
+        button.quality-btn:hover {
+            background: #777;
+        }
 
         .snap-preview {
             position: fixed;
@@ -297,6 +308,7 @@
                 <div class="config-row">
                     <div style="display:flex; gap:5px; margin-bottom:5px;">
                         <button class="play-pause-btn" onclick="togglePlay('${id}')">Ⅱ</button>
+                        <button class="quality-btn" onclick="sendCommand('${id}', 'setPlaybackQuality', ['highres'])" title="最高画質に設定">HQ</button>
                     </div>
                     音量 <input type="range" min="0" max="100" value="50" oninput="sendCommand('${id}', 'setVolume', [this.value])" style="width:70px">
                 </div>
