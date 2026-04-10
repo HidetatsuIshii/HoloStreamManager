@@ -120,9 +120,12 @@
         }
 
         #stream-manager { margin-top: 20px; flex: 1; overflow-y: auto; }
-        .stream-item {
-            background: #222; margin-bottom: 5px; padding: 8px; border-radius: 4px;
-            display: flex; justify-content: space-between; align-items: center; font-size: 11px;
+        .stream-item button {
+            background: #444;
+            transition: background 0.2s;
+        }
+        .stream-item button:hover {
+            background: #ff4444; /* ホバーで赤く */
         }
 
         /* ビデオウィンドウ */
@@ -276,11 +279,10 @@
         
         // 1. サイドバーが表示されている場合
         if (sidebar.classList.contains('active')) {
-            // クリックされたのがサイドバー自体でなければ閉じる
-            if (!sidebar.contains(e.target)) {
+            // クリックされたのが「サイドバーの外（canvas）」であれば閉じる
+            if (e.target.id === 'canvas') {
                 sidebar.classList.remove('active');
-                // サイドバーを閉じる動作を優先し、フルスクリーン切り替えは行わない
-                return;
+                return; // 閉じる動作を優先
             }
         }
     
@@ -625,12 +627,12 @@
             
             const rawData = await response.json();
             listContainer.innerHTML = '';
-    
-            // 修正ポイント2: データのフィルタリングを確実に行う
-            // Holodexは稀にゲスト出演なども拾うため、チャンネル自体の所属をチェック
+            
+            // チャンネルの所属をより厳密にチェック
             const data = rawData.filter(v => 
                 v.channel && 
-                (v.channel.org === "Hololive" || (v.channel.suborg && v.channel.suborg.includes("Hololive")))
+                (v.channel.org === "Hololive") && // 組織が完全にHololiveであること
+                (v.type === "stream")             // かつ通常の配信であること
             );
     
             if (!data || data.length === 0) {
@@ -686,13 +688,36 @@
     function updateStreamList() {
         const list = document.getElementById('stream-list');
         list.innerHTML = '';
-        document.querySelectorAll('.video-window').forEach(win => {
+        const windows = document.querySelectorAll('.video-window');
+        
+        windows.forEach(win => {
             const id = win.dataset.videoId;
+            // チャンネル名やタイトルを取得できればベストですが、簡易的にIDで表示
             const item = document.createElement('div');
             item.className = 'stream-item';
-            item.innerHTML = `<span>ID: ${id.substring(0,8)}...</span><button onclick="removeStream('${id}')">✕</button>`;
+            item.style.padding = '10px'; // 少し大きく
+            item.innerHTML = `
+                <span style="color:var(--accent)">ID: ${id.substring(0,8)}</span>
+                <button onclick="removeStream('${id}')" style="padding: 2px 8px; cursor:pointer;">削除</button>
+            `;
             list.appendChild(item);
         });
+    
+        // 配信がゼロになったらemptyに戻す
+        const sidebar = document.getElementById('sidebar');
+        if (windows.length === 0) {
+            sidebar.classList.add('empty');
+        } else {
+            sidebar.classList.remove('empty');
+        }
+    }
+    
+    function removeStream(id) {
+        const target = document.querySelector(`[data-video-id="${id}"]`);
+        if (target) {
+            target.remove();
+            updateStreamList(); // リストを再描画
+        }
     }
 
     function removeStream(id) {
