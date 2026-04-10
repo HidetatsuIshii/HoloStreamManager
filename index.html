@@ -215,11 +215,24 @@
     
     function applyStreams() {
         const sidebar = document.getElementById('sidebar');
-        const ids = document.getElementById('url-list').value.split(/\s+/).map(url => {
+        const urlInput = document.getElementById('url-list').value;
+        
+        // URLから動画IDを抽出
+        const ids = urlInput.split(/\s+/).map(url => {
             const m = url.match(/(?:v=|\/)([0-9A-Za-z_-]{11})/);
             return m ? m[1] : null;
         }).filter(id => id);
-        if (ids.length > 0) sidebar.classList.remove('empty');
+    
+        if (ids.length > 0) {
+            if (sidebar) sidebar.classList.remove('empty');
+            
+            window.postMessage({ 
+                type: "START_POLLING_REQUEST", 
+                videoIds: ids 
+            }, "*");
+            console.log("Polling request sent for:", ids);
+        }
+    
         ids.forEach((id, index) => {
             if (document.querySelector(`[data-video-id="${id}"]`)) return;
             createVideoWindow(id, index);
