@@ -634,10 +634,11 @@
                     win.classList.remove('interacting');
                     win.style.outline = "none";
                     
-                    // パネルを再表示
-                    const mainPanel = document.getElementById('controls');
+                    // このウィンドウ内にあるコントロールパネルを再表示
+                    const mainPanel = win.querySelector('.individual-config');
                     if (mainPanel) {
-                        mainPanel.style.display = 'block';
+                        // display: block に戻す（CSSのhoverで制御されている場合は空文字にする）
+                        mainPanel.style.display = ''; 
                     }
                 }
             }
