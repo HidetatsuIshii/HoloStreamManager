@@ -875,18 +875,18 @@
             console.log("受信データ:", event.data.data);
         }
         // === デバッグ用ログ出力（ここまで） ===
+    
         // 1. YouTube Player API からのメッセージ（再生・停止ボタンの同期）
         try {
             if (typeof event.data === 'string') {
                 const msg = JSON.parse(event.data);
-                // YouTubeから再生情報が届いたとき
                 if (msg.event === 'infoDelivery' && msg.info) {
                     const frames = document.querySelectorAll('iframe.main-video');
                     frames.forEach(frame => {
                         if (frame.contentWindow === event.source) {
                             const win = frame.closest('.video-window');
                             if (win && msg.info.currentTime !== undefined) {
-                                // --- 修正点：再生時間を拡張機能へ転送 ---
+                                // 再生時間を拡張機能へ転送
                                 window.postMessage({
                                     type: "SYNC_TIME_REQUEST",
                                     videoId: win.dataset.videoId,
@@ -899,15 +899,21 @@
             }
         } catch (e) {}
     
-        // 2. 拡張機能からのコメント受信（アーカイブ対応・リトライ付き）
+        // 2. 拡張機能からのコメント受信（アーカイブ対応・データ構造補正付き）
         if (event.data && event.data.type === "FROM_EXTENSION") {
-            const data = event.data.data;
-            if (!data || !data.videoId) return;
-
+            // --- 修正：データの二重構造を解消 ---
+            // background.jsの送り方によって data.data になっている場合と data になっている場合の両方に対応
+            const rawData = event.data.data;
+            const data = (rawData && rawData.data) ? rawData.data : rawData;
+    
+            if (!data || !data.videoId) {
+                console.warn("[Holo-Relay] 受信データの形式が不正です。videoIdが見つかりません:", data);
+                return;
+            }
+    
             // コメント描画を実行する内部関数
             const renderComment = (retryCount = 0) => {
-                // IDの前後空白を削除して検索精度を上げる
-                const targetId = data.videoId ? data.videoId.trim() : "";
+                const targetId = data.videoId.trim();
                 const win = document.querySelector(`[data-video-id="${targetId}"]`);
                 
                 // ウィンドウがまだない場合は最大1秒間リトライ（100ms x 10回）
@@ -915,17 +921,16 @@
                     if (retryCount < 10) {
                         setTimeout(() => renderComment(retryCount + 1), 100);
                     } else {
-                        // 失敗時に、現在存在するウィンドウIDをログに出して比較しやすくする
                         const existingIds = Array.from(document.querySelectorAll('.video-window'))
                                                  .map(el => el.dataset.videoId);
                         console.warn(`[Holo-Relay] Window not found: ${targetId}. 存在するID一覧:`, existingIds);
                     }
                     return;
                 }
-
+    
                 const canvas = win.querySelector('.comment-canvas');
                 const showChecked = win.querySelector('.cfg-show')?.checked;
-
+    
                 if (showChecked && canvas) {
                     const el = document.createElement('div');
                     el.className = 'comment-text';
@@ -933,31 +938,30 @@
                     // 属性判定（メンバーシップ・スパチャ）
                     const isMember = data.type === 'member' || data.isMember;
                     const isSupa = data.type === 'super-chat' || (data.amount && data.amount !== "");
-
+    
                     if (isMember) el.classList.add('is-member');
                     if (isSupa) el.classList.add('is-supa');
-
+    
                     el.innerHTML = data.text || "";
                     
                     // 設定値の取得
-                    const size = win.querySelector('.cfg-size')?.value || 24;
-                    const speedValue = win.querySelector('.cfg-speed')?.value || 10;
-                    // 速度計算: speedValueが大きいほどduration（時間）を短くする
+                    const size = parseInt(win.querySelector('.cfg-size')?.value) || 24;
+                    const speedValue = parseInt(win.querySelector('.cfg-speed')?.value) || 10;
+                    // 速度計算: duration（ミリ秒）を算出
                     const duration = (22 - speedValue) * 800;
-
+    
                     el.style.fontSize = size + 'px';
-                    // 縦位置をランダムに配置（0%〜90%程度）
+                    // 縦位置をランダムに配置
                     el.style.top = (Math.floor(Math.random() * 15) * 6) + '%';
                     
                     canvas.appendChild(el);
-
+    
                     // アニメーション実行
                     const startTime = performance.now();
                     const canvasWidth = canvas.offsetWidth;
-                    // 要素の幅を取得（取得できない場合は文字数から推測）
                     const elWidth = el.offsetWidth || (size * (el.innerText?.length || 5));
                     const distance = canvasWidth + elWidth + 100;
-
+    
                     function animate(time) {
                         const elapsed = time - startTime;
                         const progress = elapsed / duration;
@@ -977,21 +981,13 @@
             renderComment();
         }
     });
-
-    // --- 追加：アーカイブ配信の再生同期処理（1秒おき） ---
+    
+    // --- 追加：アーカイブ配信の再生同期処理（2秒おき） ---
     setInterval(() => {
         document.querySelectorAll('.video-window').forEach(win => {
             const videoId = win.dataset.videoId;
             const frame = win.querySelector('iframe.main-video');
-            
-            // YouTube Player API経由で現在の再生時間を取得
-            // iframeに postMessage を送って時間を要求するか、
-            // 簡易的には以下の方法で拡張機能に現在の（ツール上の）時間を伝えます
-            if (frame && frame.contentWindow) {
-                // 注意: YouTube APIから現在の時間を取得するには、
-                // 別途 Player オブジェクトを管理するか、messageイベントで受け取った時間を保持する必要があります。
-                // ここでは、拡張機能側に「現在の時間を同期せよ」という信号を送る準備をします。
-            }
+            // 必要に応じて拡張機能側へポーリング要求を送るなどの拡張が可能
         });
     }, 2000);
 </script>
