@@ -869,6 +869,12 @@
     });
 
     window.addEventListener("message", (event) => {
+        // === デバッグ用ログ出力（ここから） ===
+        if (event.data && event.data.type === "FROM_EXTENSION") {
+            console.log("%c[Extension -> HTML] メッセージを受信しました", "background: #222; color: #bada55; padding: 2px 5px;");
+            console.log("受信データ:", event.data.data);
+        }
+        // === デバッグ用ログ出力（ここまで） ===
         // 1. YouTube Player API からのメッセージ（再生・停止ボタンの同期）
         try {
             if (typeof event.data === 'string') {
