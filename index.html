@@ -453,11 +453,12 @@
                     音量 <input type="range" min="0" max="100" value="50" oninput="sendCommand('${id}', 'setVolume', [this.value])" style="width:70px">
                 </div>
                 <div class="config-row">
-                    <button onclick="window.open('https://www.youtube.com/live_chat_replay?v=${id}', '_blank', 'width=400,height=600')" 
-                            style="width:100%; cursor:pointer; background:#cc0000; color:white; border:none; padding:5px; border-radius:3px;">
-                        コメントを取得開始
+                    <button onclick="window.open('https://www.youtube.com/live_chat_replay?v=${id}&is_popout=1', '_blank', 'width=400,height=600')" 
+                            style="width:100%; cursor:pointer; background:#cc0000; color:white; border:none; padding:8px; border-radius:3px; font-weight:bold;">
+                        コメント連携を開始
                     </button>
-                    <p style="font-size:10px; color:#666; margin:5px 0;">※別窓が開くとコメントが同期されます</p>
+                    <p style="font-size:10px; color:#666; margin:5px 0;">※別窓でチャットが開くとツールに反映されます</p>
+                    
                     <label><input type="checkbox" class="cfg-show" checked> 表示</label><br>
                     サイズ <input type="range" class="cfg-size" min="10" max="60" value="24" style="width:100%"><br>
                     速度 <input type="range" class="cfg-speed" min="1" max="20" value="10" style="width:100%">
