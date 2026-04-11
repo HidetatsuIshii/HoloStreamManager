@@ -634,7 +634,11 @@
             const data = rawData.filter(v => 
                 v.channel && 
                 v.channel.org === "Hololive" && 
-                v.type === "stream"
+                // ホロスターズ(Holostars)を除外し、かつJPメンバーのみに絞る条件
+                // suborgに "Hololive" という文字列が含まれ、かつ "Stars" が含まれないものを抽出
+                v.channel.suborg && 
+                v.channel.suborg.includes("Hololive") && 
+                !v.channel.suborg.includes("Stars")
             );
         
             if (data.length === 0) {
