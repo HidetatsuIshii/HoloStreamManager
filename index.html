@@ -441,7 +441,7 @@
     function createVideoWindow(id, index) {
         const win = document.createElement('div');
         win.className = 'video-window';
-        win.dataset.videoId = id;
+        win.dataset.videoId = id.trim();
         
         // 初期配置の計算
         win.style.left = (120 + (index % 3) * 60) + 'px';
@@ -903,55 +903,65 @@
         if (event.data && event.data.type === "FROM_EXTENSION") {
             const data = event.data.data;
             if (!data || !data.videoId) return;
-    
+
             // コメント描画を実行する内部関数
             const renderComment = (retryCount = 0) => {
-                const win = document.querySelector(`[data-video-id="${data.videoId}"]`);
+                // IDの前後空白を削除して検索精度を上げる
+                const targetId = data.videoId ? data.videoId.trim() : "";
+                const win = document.querySelector(`[data-video-id="${targetId}"]`);
                 
-                // ウィンドウがまだない場合は最大1秒間リトライ（200ms x 5回）
+                // ウィンドウがまだない場合は最大1秒間リトライ（100ms x 10回）
                 if (!win) {
-                    if (retryCount < 5) {
-                        setTimeout(() => renderComment(retryCount + 1), 200);
+                    if (retryCount < 10) {
+                        setTimeout(() => renderComment(retryCount + 1), 100);
                     } else {
-                        console.warn(`[Holo-Relay] Window not found after retries: ${data.videoId}`);
+                        // 失敗時に、現在存在するウィンドウIDをログに出して比較しやすくする
+                        const existingIds = Array.from(document.querySelectorAll('.video-window'))
+                                                 .map(el => el.dataset.videoId);
+                        console.warn(`[Holo-Relay] Window not found: ${targetId}. 存在するID一覧:`, existingIds);
                     }
                     return;
                 }
-    
+
                 const canvas = win.querySelector('.comment-canvas');
                 const showChecked = win.querySelector('.cfg-show')?.checked;
-    
+
                 if (showChecked && canvas) {
                     const el = document.createElement('div');
                     el.className = 'comment-text';
                     
-                    // 属性判定
+                    // 属性判定（メンバーシップ・スパチャ）
                     const isMember = data.type === 'member' || data.isMember;
                     const isSupa = data.type === 'super-chat' || (data.amount && data.amount !== "");
-    
+
                     if (isMember) el.classList.add('is-member');
                     if (isSupa) el.classList.add('is-supa');
-    
+
                     el.innerHTML = data.text || "";
                     
+                    // 設定値の取得
                     const size = win.querySelector('.cfg-size')?.value || 24;
                     const speedValue = win.querySelector('.cfg-speed')?.value || 10;
+                    // 速度計算: speedValueが大きいほどduration（時間）を短くする
                     const duration = (22 - speedValue) * 800;
-    
+
                     el.style.fontSize = size + 'px';
+                    // 縦位置をランダムに配置（0%〜90%程度）
                     el.style.top = (Math.floor(Math.random() * 15) * 6) + '%';
                     
                     canvas.appendChild(el);
-    
+
                     // アニメーション実行
                     const startTime = performance.now();
                     const canvasWidth = canvas.offsetWidth;
+                    // 要素の幅を取得（取得できない場合は文字数から推測）
                     const elWidth = el.offsetWidth || (size * (el.innerText?.length || 5));
                     const distance = canvasWidth + elWidth + 100;
-    
+
                     function animate(time) {
                         const elapsed = time - startTime;
                         const progress = elapsed / duration;
+                        // 右から左へ移動
                         el.style.transform = `translateX(-${distance * progress}px)`;
                         
                         if (progress < 1) {
