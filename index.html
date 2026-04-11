@@ -418,15 +418,21 @@
         const win = document.createElement('div');
         win.className = 'video-window';
         win.dataset.videoId = id;
+        
+        // 初期配置の計算
         win.style.left = (120 + (index % 3) * 60) + 'px';
         win.style.top = (120 + Math.floor(index / 3) * 60) + 'px';
+        
+        // zIndexの管理（未定義の場合は1から開始）
+        if (typeof windowZIndex === 'undefined') window = 100; 
         win.style.zIndex = windowZIndex++;
-
+    
         win.innerHTML = `
             <div class="individual-config">
                 <div class="close-btn" onclick="removeStream('${id}')" title="配信を閉じる">×</div>
                 
-                <div class="config-row" style="margin-top: 15px;"> <div style="display:flex; gap:5px; margin-bottom:5px;">
+                <div class="config-row" style="margin-top: 15px;"> 
+                    <div style="display:flex; gap:5px; margin-bottom:5px;">
                         <button class="play-pause-btn" onclick="togglePlay('${id}')">Ⅱ</button>
                         <button id="hq-btn-${id}" class="quality-btn active" onclick="toggleHighQuality('${id}')" title="最高画質: ON">HQ</button>
                     </div>
@@ -444,37 +450,38 @@
                 <div class="comment-canvas"></div>
             </div>
         `;
-
+    
+        // 外部依存変数のチェック（guard要素がない場合のフォールバック）
+        const dragGuard = document.getElementById('guard') || { style: {} };
+        const preview = document.getElementById('snap-preview') || { style: {} };
+    
         let isResizing = false;
         let currentHandle = '';
-
-        // --- リサイズ判定の修正 ---
+    
+        // --- リサイズ判定 ---
         win.onmousemove = (e) => {
-            // 設定パネルの上では何もしない
             if (e.target.closest('.individual-config')) {
                 win.style.cursor = 'default';
                 return;
             }
-        
+            
             if (win.classList.contains('interacting') || isResizing) return;
             
             const rect = win.getBoundingClientRect();
-            const hit = 25; // 判定範囲を25pxに変更
+            const hit = 25; 
             let cursor = '';
             
-            // 上下左右の端から25px以内か判定
             const isTop = (e.clientY - rect.top < hit);
             const isBottom = (rect.bottom - e.clientY < hit);
             const isLeft = (e.clientX - rect.left < hit);
             const isRight = (rect.right - e.clientX < hit);
-        
+            
             if (isTop) cursor += 'n';
             else if (isBottom) cursor += 's';
             
             if (isLeft) cursor += 'w';
             else if (isRight) cursor += 'e';
             
-            // リサイズ領域にいる場合のみカーソルを変更
             if (cursor) {
                 win.style.cursor = cursor + '-resize';
                 currentHandle = cursor;
@@ -483,21 +490,22 @@
                 currentHandle = '';
             }
         };
-
+    
+        // --- リサイズ実行 ---
         win.onmousedown = (e) => {
             if (win.style.cursor.includes('resize')) {
                 isResizing = true;
-                guard.style.display = 'block';
-                guard.style.cursor = win.style.cursor;
+                dragGuard.style.display = 'block';
+                dragGuard.style.cursor = win.style.cursor;
                 win.classList.add('moving');
-
+    
                 const startW = win.offsetWidth;
                 const startH = win.offsetHeight;
                 const startX = e.clientX;
                 const startY = e.clientY;
                 const startL = win.offsetLeft;
                 const startT = win.offsetTop;
-
+    
                 const onMove = (ev) => {
                     if (currentHandle.includes('e')) win.style.width = Math.max(200, startW + (ev.clientX - startX)) + 'px';
                     if (currentHandle.includes('s')) win.style.height = Math.max(120, startH + (ev.clientY - startY)) + 'px';
@@ -512,9 +520,10 @@
                         win.style.height = newH + 'px';
                     }
                 };
+    
                 const onUp = () => {
                     isResizing = false;
-                    guard.style.display = 'none';
+                    dragGuard.style.display = 'none';
                     win.classList.remove('moving');
                     document.removeEventListener('mousemove', onMove);
                     document.removeEventListener('mouseup', onUp);
@@ -524,32 +533,25 @@
                 e.preventDefault();
             }
         };
-
-        // ドラッグ & スナップ（判定 100px）
+    
+        // --- ドラッグ & スナップ ---
         const overlay = win.querySelector('.drag-overlay');
-        const configPanel = win.querySelector('.individual-config');
         overlay.onmousedown = (e) => {
-            // リサイズ領域（25px以内）や設定パネル上では移動を開始しない
-            if (win.style.cursor.includes('resize') || e.target.closest('.individual-config')) {
-                return;
-            }
-            
-            if (isResizing) return;
+            if (win.style.cursor.includes('resize') || e.target.closest('.individual-config')) return;
+            if (isResizing || win.classList.contains('interacting')) return;
             
             win.classList.add('moving');
             win.style.zIndex = windowZIndex++;
-            guard.style.display = 'block';
-            guard.style.cursor = 'move';
-
+            dragGuard.style.display = 'block';
+            dragGuard.style.cursor = 'move';
+    
             let shiftX = e.clientX - win.getBoundingClientRect().left;
             let shiftY = e.clientY - win.getBoundingClientRect().top;
-
-            const preview = document.getElementById('snap-preview');
+    
             const onMove = (ev) => {
                 win.style.left = ev.pageX - shiftX + 'px';
                 win.style.top = ev.pageY - shiftY + 'px';
             
-                // スナップ予測の表示
                 const snapRange = 100;
                 const sw = window.innerWidth;
                 const sh = window.innerHeight;
@@ -566,85 +568,83 @@
                 else if (y < snapRange) preRect = {l:0, t:0, w:sw, h:sh/2};
                 else if (y > sh - snapRange) preRect = {l:0, t:sh/2, w:sw, h:sh/2};
             
-                if (preRect) {
+                if (preRect && preview.style) {
                     preview.style.display = 'block';
                     preview.style.left = preRect.l + 'px';
                     preview.style.top = preRect.t + 'px';
                     preview.style.width = preRect.w + 'px';
                     preview.style.height = preRect.h + 'px';
-                } else {
+                } else if (preview.style) {
                     preview.style.display = 'none';
                 }
             };
-
+    
             const onUp = (ev) => {
-                preview.style.display = 'none';
+                if (preview.style) preview.style.display = 'none';
                 win.classList.remove('moving');
-                guard.style.display = 'none';
+                dragGuard.style.display = 'none';
                 document.removeEventListener('mousemove', onMove);
                 document.removeEventListener('mouseup', onUp);
-
-                const snapRange = 100; // スナップ判定範囲を拡大
+    
+                const snapRange = 100;
                 const sw = window.innerWidth;
                 const sh = window.innerHeight;
                 const x = ev.clientX;
                 const y = ev.clientY;
-
-                if (x < snapRange && y < snapRange) snap(0, 0, sw/2, sh/2); // 左上
-                else if (x > sw - snapRange && y < snapRange) snap(sw/2, 0, sw/2, sh/2); // 右上
-                else if (x < snapRange && y > sh - snapRange) snap(0, sh/2, sw/2, sh/2); // 左下
-                else if (x > sw - snapRange && y > sh - snapRange) snap(sw/2, sh/2, sw/2, sh/2); // 右下
-                else if (x < snapRange) snap(0, 0, sw/2, sh); // 左
-                else if (x > sw - snapRange) snap(sw/2, 0, sw/2, sh); // 右
-                else if (y < snapRange) snap(0, 0, sw, sh/2); // 上
-                else if (y > sh - snapRange) snap(0, sh/2, sw, sh/2); // 下
+    
+                const snap = (l, t, w, h) => {
+                    win.style.left = l + 'px'; win.style.top = t + 'px';
+                    win.style.width = w + 'px'; win.style.height = h + 'px';
+                };
+    
+                if (x < snapRange && y < snapRange) snap(0, 0, sw/2, sh/2);
+                else if (x > sw - snapRange && y < snapRange) snap(sw/2, 0, sw/2, sh/2);
+                else if (x < snapRange && y > sh - snapRange) snap(0, sh/2, sw/2, sh/2);
+                else if (x > sw - snapRange && y > sh - snapRange) snap(sw/2, sh/2, sw/2, sh/2);
+                else if (x < snapRange) snap(0, 0, sw/2, sh);
+                else if (x > sw - snapRange) snap(sw/2, 0, sw/2, sh);
+                else if (y < snapRange) snap(0, 0, sw, sh/2);
+                else if (y > sh - snapRange) snap(0, sh/2, sw, sh/2);
             };
-
-            function snap(l, t, w, h) {
-                win.style.left = l + 'px'; win.style.top = t + 'px';
-                win.style.width = w + 'px'; win.style.height = h + 'px';
-            }
-
+    
             document.addEventListener('mousemove', onMove);
             document.addEventListener('mouseup', onUp);
         };
-
-        // --- 右クリック：元通り禁止（最前面へ移動させるだけ） ---
-        overlay.oncontextmenu = (e) => {
-            e.preventDefault(); 
-            win.style.zIndex = windowZIndex++;
-        };
+    
+        // --- 各種イベント設定 ---
         
-        // --- ダブルクリック：操作モード（YouTubeメニューへのアクセス）を開放 ---
+        // ダブルクリック：操作モード
         overlay.ondblclick = () => {
             win.classList.add('interacting');
-            // ヒント：操作モードになったことがわかるようにボーダーの色を変えるのもアリです
         };
         
-        // ウィンドウの外をクリックしたら「操作モード」を解除して「移動モード」に戻す
+        // モード解除
         window.addEventListener('mousedown', (e) => {
             if (!win.contains(e.target)) {
                 win.classList.remove('interacting');
             }
         });
-
-        // ウィンドウ全体での右クリック禁止を再有効化
+    
+        // 右クリック：最前面へ（ブラウザメニュー禁止）
         win.oncontextmenu = (e) => {
             e.preventDefault(); 
             win.style.zIndex = windowZIndex++;
         };
         
+        // iframeの読み込み完了時（画質自動設定）
         const iframe = win.querySelector('iframe');
         iframe.onload = () => {
-            // 読み込み完了後、少し待ってから最高画質コマンドを送信
             setTimeout(() => {
-                // 初回実行時はactive状態（HQ）なので、コマンドだけ送信
-                if (win.querySelector('.quality-btn').classList.contains('active')) {
-                    sendCommand(id, 'setPlaybackQuality', ['highres']);
+                const hqBtn = win.querySelector('.quality-btn');
+                if (hqBtn && hqBtn.classList.contains('active')) {
+                    if (typeof sendCommand === 'function') {
+                        sendCommand(id, 'setPlaybackQuality', ['highres']);
+                    }
                 }
             }, 2000); 
         };
-        document.getElementById('canvas').appendChild(win); // これは既存の行
+    
+        document.getElementById('canvas').appendChild(win);
     }
 
     // 個別に動画を追加する関数（カードクリック時に呼ばれる）
@@ -811,77 +811,103 @@
         lastWindowHeight = newHeight;
     });
 
-    // コメント受信：innerHTMLを使用して絵文字を復活
+    // メッセージ受信イベント：YouTubeの状態監視 ＆ 拡張機能からのコメント処理
     window.addEventListener("message", (event) => {
+        // 1. YouTube Player API からのメッセージ処理 (Playerの状態変更など)
         try {
+            if (typeof event.data === 'string') {
                 const msg = JSON.parse(event.data);
+                
+                // YouTube APIの再生状態監視 (infoDeliveryイベント)
                 if (msg.event === 'infoDelivery' && msg.info && msg.info.playerState !== undefined) {
-                    // 動画IDを特定（iframeのsrcなどから）
                     const frames = document.querySelectorAll('iframe.main-video');
                     frames.forEach(frame => {
+                        // 送信元のiframeを特定
                         if (frame.contentWindow === event.source) {
                             const win = frame.closest('.video-window');
                             const btn = win.querySelector('.play-pause-btn');
+                            
                             // 1 = 再生中, 2 = 一時停止中
-                            btn.innerText = (msg.info.playerState === 1) ? 'Ⅱ' : '▶';
+                            if (btn) {
+                                btn.innerText = (msg.info.playerState === 1) ? 'Ⅱ' : '▶';
+                            }
                         }
                     });
                 }
-            } catch(e) {}
+            }
+        } catch (e) {
+            // JSONパース失敗時は無視
+        }
+    
+        // 2. 拡張機能からのコメント受信処理
         if (event.data && event.data.type === "FROM_EXTENSION") {
             const data = event.data.data;
+            if (!data || !data.videoId) return;
+    
+            // 対象のウィンドウを特定
             const win = document.querySelector(`[data-video-id="${data.videoId}"]`);
+            
+            // ウィンドウが存在し、かつ「表示」チェックボックスがオンの場合のみ処理
             if (win && win.querySelector('.cfg-show').checked) {
                 const canvas = win.querySelector('.comment-canvas');
                 const el = document.createElement('div');
                 el.className = 'comment-text';
                 
-                // --- 判定ロジックの強化 ---
-                // 拡張機能によってプロパティ名が異なるため、代表的なものを網羅
+                // --- メンバーシップ・スパチャ判定の強化 ---
                 const isMember = data.isMember || 
-                                 data.type === 'member' ||  // ← これを追加
+                                 data.type === 'member' || 
                                  data.authorType === 'member' || 
-                                 data.authorType === 'MEMBER' || // 大文字もカバー
+                                 data.authorType === 'MEMBER' || 
                                  data.membership === true || 
-                                 (data.badge && data.badge.includes('member'));
-
+                                 (data.badge && typeof data.badge === 'string' && data.badge.includes('member'));
+    
                 const isSupa = data.isSupa || 
                                data.purchaseAmount || 
-                               data.type === 'superchat' ||
+                               data.type === 'superchat' || 
                                data.type === 'super-chat';
         
-                if (isMember) {
-                    el.classList.add('is-member');
-                }
-                if (isSupa) {
-                    el.classList.add('is-supa');
-                }
+                if (isMember) el.classList.add('is-member');
+                if (isSupa) el.classList.add('is-supa');
         
-                el.innerHTML = data.text;
+                // 絵文字を復活させるためinnerHTMLを使用
+                el.innerHTML = data.text || "";
                 
-                // フォントサイズと速度の取得
+                // --- フォントサイズと流れる速度の設定 ---
                 const size = win.querySelector('.cfg-size').value;
                 const speedValue = win.querySelector('.cfg-speed').value;
+                
+                // 速度計算：スライダーの値が大きいほど duration を短く（速く）する
                 const duration = (22 - speedValue) * 800;
-
+    
                 el.style.fontSize = size + 'px';
-                // 高さを「行」で管理して重なりを軽減（0-14行のどこか）
+                el.style.position = 'absolute'; // 必須
+                el.style.whiteSpace = 'nowrap'; // 改行防止
+                
+                // 出現位置（縦方向）をランダムに分散（0%〜84%の範囲で6%刻み）
                 el.style.top = (Math.floor(Math.random() * 15) * 6) + '%';
                 el.style.left = '100%';
                 
                 canvas.appendChild(el);
-
+    
+                // --- アニメーション処理 ---
                 const startTime = performance.now();
+                const canvasWidth = win.offsetWidth;
+                
                 function animate(time) {
                     const progress = (time - startTime) / duration;
-                    // 流れる距離を計算
-                    const distance = win.offsetWidth + el.offsetWidth + 200;
-                    el.style.transform = `translateX(-${distance * progress}px)`;
+                    
+                    // 流れる総距離 = キャンバス幅 + 要素自体の幅 + 余裕分
+                    const elWidth = el.offsetWidth;
+                    const distance = canvasWidth + elWidth + 100;
+                    
+                    // 現在の移動距離を計算
+                    const currentPos = distance * progress;
+                    el.style.transform = `translateX(-${currentPos}px)`;
                     
                     if (progress < 1) {
                         requestAnimationFrame(animate);
                     } else {
-                        el.remove();
+                        el.remove(); // 画面外に出たら削除
                     }
                 }
                 requestAnimationFrame(animate);
