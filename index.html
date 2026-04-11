@@ -160,24 +160,56 @@
         }
 
         /* サイドバーの配信中カード */
-        .live-member-card {
+        /* 配信中リストのカードデザイン */
+        .live-card {
+            display: flex;
+            gap: 10px;
             background: rgba(40, 40, 40, 0.5);
-            padding: 6px;
-            border-radius: 6px;
+            padding: 8px;
+            border-radius: 8px;
             border: 1px solid #333;
+            margin-bottom: 8px;
             cursor: pointer;
             transition: all 0.2s ease;
-            margin-bottom: 4px;
+            align-items: center;
         }
         
-        .live-member-card:hover {
+        .live-card:hover {
             background: rgba(60, 60, 60, 0.8);
             border-color: var(--accent);
-            transform: translateX(4px);
+            transform: translateX(5px);
         }
         
-        .live-member-card:active {
-            transform: scale(0.98);
+        .live-thumb {
+            width: 100px;
+            height: 56px;
+            object-fit: cover;
+            border-radius: 4px;
+            flex-shrink: 0;
+        }
+        
+        .live-card-info {
+            flex: 1;
+            overflow: hidden;
+        }
+        
+        .live-card-channel {
+            font-size: 11px;
+            color: var(--accent);
+            font-weight: bold;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .live-card-title {
+            font-size: 10px;
+            color: #ccc;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            line-height: 1.3;
         }
 
         /* 統合コントロールパネル */
@@ -604,6 +636,26 @@
         document.getElementById('canvas').appendChild(win); // これは既存の行
     }
 
+    // 個別に動画を追加する関数（カードクリック時に呼ばれる）
+    function addStream(id) {
+        if (document.querySelector(`[data-video-id="${id}"]`)) return;
+        
+        // サイドバーの「empty」状態を解除
+        const sidebar = document.getElementById('sidebar');
+        if (sidebar) sidebar.classList.remove('empty');
+    
+        // 既存の作成関数を流用（indexは現在のウィンドウ数にする）
+        const currentIndex = document.querySelectorAll('.video-window').length;
+        createVideoWindow(id, currentIndex);
+        updateStreamList();
+    
+        // 拡張機能へポーリング開始を通知
+        window.postMessage({ 
+            type: "START_POLLING_REQUEST", 
+            videoIds: [id] 
+        }, "*");
+    }
+    
     // Holodex APIから配信中データを取得して表示
     async function updateHoloLiveStatus() {
         const listContainer = document.getElementById('hololive-live-list');
@@ -619,11 +671,9 @@
             const rawData = await response.json();
             listContainer.innerHTML = '';
     
-            // 【確定フィルタリング】
-            // 組織がHololiveであり、かつサブ組織に「HOLOSTARS」が含まれない（大文字小文字無視）ものだけを抽出
+            // フィルタリング（Hololiveのみ、かつホロスターズ除外）
             const data = rawData.filter(v => {
                 if (!v.channel || v.channel.org !== "Hololive") return false;
-                
                 const suborg = v.channel.suborg ? v.channel.suborg.toUpperCase() : "";
                 return !suborg.includes("HOLOSTARS");
             });
@@ -633,29 +683,28 @@
                 return;
             }
     
-            // チャンネルの重複排除（同じ配信者が複数枠持っている場合）
+            // 重複排除
             const uniqueData = Array.from(new Map(data.map(item => [item.channel.id, item])).values());
     
             uniqueData.forEach(video => {
                 const card = document.createElement('div');
                 card.className = 'live-card';
-                // 表示用の名前を整形（絵文字や余計な空白を削る場合はここで行う）
-                const channelName = video.channel.name.replace(/Ch\.|- /gi, '').trim();
                 
+                const channelName = video.channel.name.replace(/Ch\.|- /gi, '').trim();
+                // サムネイルURL（YouTubeの標準形式）
+                const thumbUrl = `https://img.youtube.com/vi/${video.id}/mqdefault.jpg`;
+    
                 card.innerHTML = `
-                    <div class="live-status-badge">LIVE</div>
+                    <img src="${thumbUrl}" class="live-thumb" alt="thumbnail">
                     <div class="live-card-info">
                         <div class="live-card-channel">${channelName}</div>
                         <div class="live-card-title">${video.title}</div>
                     </div>
                 `;
                 
-                // クリックでメイン画面に配信を追加
-                card.onclick = () => {
-                    if (typeof addStream === 'function') {
-                        addStream(video.id);
-                    }
-                };
+                // クリックイベント
+                card.onclick = () => addStream(video.id);
+                
                 listContainer.appendChild(card);
             });
     
