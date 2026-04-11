@@ -617,27 +617,51 @@
             });
     
             const rawData = await response.json();
-            
-            // --- 調査用ログ出力 ---
-            console.group("【Holodex API 取得データ調査】");
-            console.log("取得件数:", rawData.length);
-            rawData.forEach(v => {
-                console.log(`名前: ${v.channel.name} | Org: ${v.channel.org} | Suborg: ${v.channel.suborg}`);
-            });
-            console.groupEnd();
-            // ---------------------
-    
-            // 一旦、全ての "Hololive" 組織を表示するようにして挙動を見ます
-            const data = rawData.filter(v => v.channel && v.channel.org === "Hololive");
-            
-            // （以下、既存のカード生成処理...）
             listContainer.innerHTML = '';
-            data.forEach(video => {
-                /* 既存の表示ロジック */
+    
+            // 【確定フィルタリング】
+            // 組織がHololiveであり、かつサブ組織に「HOLOSTARS」が含まれない（大文字小文字無視）ものだけを抽出
+            const data = rawData.filter(v => {
+                if (!v.channel || v.channel.org !== "Hololive") return false;
+                
+                const suborg = v.channel.suborg ? v.channel.suborg.toUpperCase() : "";
+                return !suborg.includes("HOLOSTARS");
+            });
+    
+            if (data.length === 0) {
+                listContainer.innerHTML = '<p style="font-size: 10px; color: #666; text-align: center; padding: 10px;">現在配信中の公式メンバーはいません</p>';
+                return;
+            }
+    
+            // チャンネルの重複排除（同じ配信者が複数枠持っている場合）
+            const uniqueData = Array.from(new Map(data.map(item => [item.channel.id, item])).values());
+    
+            uniqueData.forEach(video => {
+                const card = document.createElement('div');
+                card.className = 'live-card';
+                // 表示用の名前を整形（絵文字や余計な空白を削る場合はここで行う）
+                const channelName = video.channel.name.replace(/Ch\.|- /gi, '').trim();
+                
+                card.innerHTML = `
+                    <div class="live-status-badge">LIVE</div>
+                    <div class="live-card-info">
+                        <div class="live-card-channel">${channelName}</div>
+                        <div class="live-card-title">${video.title}</div>
+                    </div>
+                `;
+                
+                // クリックでメイン画面に配信を追加
+                card.onclick = () => {
+                    if (typeof addStream === 'function') {
+                        addStream(video.id);
+                    }
+                };
+                listContainer.appendChild(card);
             });
     
         } catch (error) {
             console.error('API Error:', error);
+            listContainer.innerHTML = '<p style="color:red; font-size:10px;">API取得エラー</p>';
         }
     }
     
