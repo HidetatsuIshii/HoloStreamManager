@@ -206,7 +206,7 @@
             line-height: 1.3;
         }
 
-        /* 統合コントロールパネル */
+        /* 総合コントロールパネル */
         .individual-config {
             position: absolute;
             top: 25px;    /* 少し余白を調整 */
@@ -617,13 +617,13 @@
         overlay.ondblclick = () => {
             win.classList.add('interacting');
             
-            // 総合コントロールパネルを非表示にする
-            const mainPanel = document.getElementById('individual-config');
+            // このウィンドウ内にあるコントロールパネルを探して非表示にする
+            const mainPanel = win.querySelector('.individual-config');
             if (mainPanel) {
-                mainPanel.style.display = 'none';
+                mainPanel.style.setProperty('display', 'none', 'important');
             }
             
-            // 視覚的に切り替わったことを示す（枠線を光らせるなど）
+            // 視覚的に切り替わったことを示す
             win.style.outline = "3px solid #ff0055";
         };
         
@@ -836,9 +836,9 @@
 
     // メッセージ受信イベント：YouTubeの状態監視 ＆ 拡張機能からのコメント処理
     window.addEventListener("message", (event) => {
-        console.log("Message received:", event.data);
-        
-        // 1. YouTube Player API からのメッセージ処理 (Playerの状態変更など)
+        // console.log("Message received:", event.data); // デバッグ用
+    
+        // --- 1. YouTube Player API からのメッセージ処理 (Playerの状態変更など) ---
         try {
             if (typeof event.data === 'string') {
                 const msg = JSON.parse(event.data);
@@ -850,6 +850,7 @@
                         // 送信元のiframeを特定
                         if (frame.contentWindow === event.source) {
                             const win = frame.closest('.video-window');
+                            if (!win) return;
                             const btn = win.querySelector('.play-pause-btn');
                             
                             // 1 = 再生中, 2 = 一時停止中
@@ -861,53 +862,57 @@
                 }
             }
         } catch (e) {
-            // JSONパース失敗時は無視
+            // JSONパース失敗時やYouTube API以外の文字列メッセージは無視
         }
     
-        // 2. 拡張機能からのコメント受信処理
+        // --- 2. 拡張機能からのコメント受信処理 ---
         if (event.data && event.data.type === "FROM_EXTENSION") {
-            console.log("Comment data matched:", event.data.data);
             const data = event.data.data;
             if (!data || !data.videoId) return;
     
-            // 対象のウィンドウを特定
+            // 対象の動画ウィンドウを特定
             const win = document.querySelector(`[data-video-id="${data.videoId}"]`);
             
-            // ウィンドウが存在し、かつ「表示」チェックボックスがオンの場合のみ処理
-            if (win && win.querySelector('.cfg-show').checked) {
+            // ウィンドウが存在し、かつ「表示(cfg-show)」チェックボックスがオンの場合のみ処理
+            if (win && win.querySelector('.cfg-show')?.checked) {
                 const canvas = win.querySelector('.comment-canvas');
+                if (!canvas) return;
+    
                 const el = document.createElement('div');
                 el.className = 'comment-text';
                 
                 // --- メンバーシップ・スパチャ判定の強化 ---
-                const isMember = data.isMember || 
-                                 data.type === 'member' || 
+                const isMember = data.type === 'member' || 
+                                 data.isMember || 
                                  data.authorType === 'member' || 
                                  data.authorType === 'MEMBER' || 
                                  data.membership === true || 
                                  (data.badge && typeof data.badge === 'string' && data.badge.includes('member'));
     
-                const isSupa = data.isSupa || 
-                               data.purchaseAmount || 
+                const isSupa = data.type === 'super-chat' || 
                                data.type === 'superchat' || 
-                               data.type === 'super-chat';
-        
+                               data.isSupa || 
+                               (data.amount && data.amount !== "");
+    
                 if (isMember) el.classList.add('is-member');
                 if (isSupa) el.classList.add('is-supa');
-        
-                // 絵文字を復活させるためinnerHTMLを使用
+    
+                // テキストまたはHTML（絵文字入り）を設定
                 el.innerHTML = data.text || "";
                 
-                // --- フォントサイズと流れる速度の設定 ---
-                const size = win.querySelector('.cfg-size').value;
-                const speedValue = win.querySelector('.cfg-speed').value;
+                // --- 設定値の取得 ---
+                const size = win.querySelector('.cfg-size')?.value || 24;
+                const speedValue = win.querySelector('.cfg-speed')?.value || 10;
                 
                 // 速度計算：スライダーの値が大きいほど duration を短く（速く）する
+                // 22に近いほど高速、小さいほど低速
                 const duration = (22 - speedValue) * 800;
     
+                // --- スタイル適用 ---
                 el.style.fontSize = size + 'px';
-                el.style.position = 'absolute'; // 必須
-                el.style.whiteSpace = 'nowrap'; // 改行防止
+                el.style.position = 'absolute';
+                el.style.whiteSpace = 'nowrap';
+                el.style.willChange = 'transform'; // アニメーションの最適化
                 
                 // 出現位置（縦方向）をランダムに分散（0%〜84%の範囲で6%刻み）
                 el.style.top = (Math.floor(Math.random() * 15) * 6) + '%';
@@ -915,25 +920,24 @@
                 
                 canvas.appendChild(el);
     
-                // --- アニメーション処理 ---
+                // --- アニメーション処理（requestAnimationFrame） ---
                 const startTime = performance.now();
-                const canvasWidth = win.offsetWidth;
+                const canvasWidth = canvas.offsetWidth;
+                const elWidth = el.offsetWidth || (size * el.innerText.length); // 幅が取得できない場合のフォールバック
+                const distance = canvasWidth + elWidth + 100;
                 
                 function animate(time) {
-                    const progress = (time - startTime) / duration;
+                    const elapsed = time - startTime;
+                    const progress = elapsed / duration;
                     
-                    // 流れる総距離 = キャンバス幅 + 要素自体の幅 + 余裕分
-                    const elWidth = el.offsetWidth;
-                    const distance = canvasWidth + elWidth + 100;
-                    
-                    // 現在の移動距離を計算
+                    // 現在の移動距離を計算 (右端 100% から 左端へ)
                     const currentPos = distance * progress;
                     el.style.transform = `translateX(-${currentPos}px)`;
                     
                     if (progress < 1) {
                         requestAnimationFrame(animate);
                     } else {
-                        el.remove(); // 画面外に出たら削除
+                        el.remove(); // 画面外に出たら要素を削除してメモリ解放
                     }
                 }
                 requestAnimationFrame(animate);
