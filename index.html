@@ -147,6 +147,11 @@
         }
         .video-window.interacting .drag-overlay { pointer-events: none; }
 
+        /* 操作モード中は、マウスを載せてもパネルを出さない */
+        .video-window.interacting .individual-config {
+            display: none !important;
+        }
+
         /* リサイズ・ドラッグ中の全画面ガード */
         #global-guard {
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
@@ -328,7 +333,16 @@
             }
         }
     
-        // 2. サイドバーが閉まっている状態でのキャンバスクリック（フルスクリーン制御）
+        // --- 追加修正点 ---
+        // 2. 操作モード（interacting）のウィンドウがあるかチェック
+        // 一つでも操作モードのウィンドウがあれば、全画面切り替えをブロックする
+        const isAnyInteracting = document.querySelector('.video-window.interacting') !== null;
+        if (isAnyInteracting) {
+            return; // 何もしない（全画面切り替えを抑制）
+        }
+        // ------------------
+    
+        // 3. サイドバーが閉まっていて、かつ操作モードでもない状態でのキャンバスクリック
         if (e.target.id === 'canvas') {
             if (!document.fullscreenElement) {
                 document.documentElement.requestFullscreen().catch(err => {
