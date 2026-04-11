@@ -627,20 +627,22 @@
             
             const rawData = await response.json();
             listContainer.innerHTML = '';
-            
-            // チャンネルの所属をより厳密にチェック
+        
+            // 【修正ポイント】
+            // 1. channelオブジェクトが存在し、その組織(org)が厳密に "Hololive" であること
+            // 2. 念のため type が "stream" であることを確認
             const data = rawData.filter(v => 
                 v.channel && 
-                (v.channel.org === "Hololive") && // 組織が完全にHololiveであること
-                (v.type === "stream")             // かつ通常の配信であること
+                v.channel.org === "Hololive" && 
+                v.type === "stream"
             );
-    
-            if (!data || data.length === 0) {
-                listContainer.innerHTML = '<p style="font-size: 10px; color: #666; text-align: center;">現在配信中のメンバーはいません</p>';
+        
+            if (data.length === 0) {
+                listContainer.innerHTML = '<p style="font-size: 10px; color: #666; text-align: center;">現在配信中の公式メンバーはいません</p>';
                 return;
             }
-    
-            // 念のため、同じチャンネルの重複を排除
+        
+            // 重複排除 (同じチャンネルで複数の枠がある場合、最新の1つだけを表示)
             const uniqueData = Array.from(new Map(data.map(item => [item.channel.id, item])).values());
     
             uniqueData.forEach(video => {
