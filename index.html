@@ -209,19 +209,39 @@
         /* 統合コントロールパネル */
         .individual-config {
             position: absolute;
-            top: 25px;
-            left: 25px;
+            top: 25px;    /* 少し余白を調整 */
+            right: 25px;  /* leftからrightへ変更 */
             background: rgba(0,0,0,0.95);
             padding: 10px;
             border-radius: 6px;
             display: none;
-            z-index: 5000; /* 十分に高い値に設定して最前面へ */
+            z-index: 5000;
             font-size: 10px;
-            width: 130px;
+            width: 140px; /* ボタン追加分、少し幅を広げると安定します */
             border: 1px solid #555;
             transform: scale(0.85);
-            transform-origin: top left;
-            pointer-events: auto; /* 確実にクリックを有効化 */
+            transform-origin: top right; /* 拡大の起点を右上に変更 */
+            pointer-events: auto;
+        }
+        /* 閉じるボタン（×）のスタイル */
+        .close-btn {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            width: 20px;
+            height: 20px;
+            line-height: 18px;
+            text-align: center;
+            background: #444;
+            color: #fff;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+        
+        .close-btn:hover {
+            background: #ff4444; /* ホバーで赤く光る */
         }
         .video-window:hover .individual-config { display: block; }
         .config-row { margin-bottom: 8px; border-bottom: 1px solid #333; padding-bottom: 4px; }
@@ -404,8 +424,9 @@
 
         win.innerHTML = `
             <div class="individual-config">
-                <div class="config-row">
-                    <div style="display:flex; gap:5px; margin-bottom:5px;">
+                <div class="close-btn" onclick="removeStream('${id}')" title="配信を閉じる">×</div>
+                
+                <div class="config-row" style="margin-top: 15px;"> <div style="display:flex; gap:5px; margin-bottom:5px;">
                         <button class="play-pause-btn" onclick="togglePlay('${id}')">Ⅱ</button>
                         <button id="hq-btn-${id}" class="quality-btn active" onclick="toggleHighQuality('${id}')" title="最高画質: ON">HQ</button>
                     </div>
