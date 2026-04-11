@@ -633,12 +633,11 @@
             // 2. 念のため type が "stream" であることを確認
             const data = rawData.filter(v => 
                 v.channel && 
+                // 1. 親組織が "Hololive" であること（これで全女性グループが対象になります）
                 v.channel.org === "Hololive" && 
-                // ホロスターズ(Holostars)を除外し、かつJPメンバーのみに絞る条件
-                // suborgに "Hololive" という文字列が含まれ、かつ "Stars" が含まれないものを抽出
-                v.channel.suborg && 
-                v.channel.suborg.includes("Hololive") && 
-                !v.channel.suborg.includes("Stars")
+                // 2. サブ組織に "Stars" という文字が入っていないこと（これで男性陣を除外）
+                // ※ suborg が未定義の場合を考慮して optional chaining または空文字チェックを入れると安全です
+                !(v.channel.suborg && v.channel.suborg.includes("Stars"))
             );
         
             if (data.length === 0) {
