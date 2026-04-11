@@ -607,81 +607,37 @@
     // Holodex APIから配信中データを取得して表示
     async function updateHoloLiveStatus() {
         const listContainer = document.getElementById('hololive-live-list');
-        if (!listContainer) return;
-    
         const API_KEY = '65f92c6d-c919-4861-a3a6-735a7290ec4a'; 
-        
-        // 修正ポイント1: topicパラメータを削除し、確実にホロ所属メンバーを拾うように変更
         const url = 'https://holodex.net/api/v2/live?org=Hololive&status=live&type=stream';
     
         try {
             const response = await fetch(url, {
                 method: 'GET',
-                headers: {
-                    'X-APIKEY': API_KEY,
-                    'Content-Type': 'application/json'
-                }
+                headers: { 'X-APIKEY': API_KEY, 'Content-Type': 'application/json' }
             });
     
-            if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
-            
             const rawData = await response.json();
+            
+            // --- 調査用ログ出力 ---
+            console.group("【Holodex API 取得データ調査】");
+            console.log("取得件数:", rawData.length);
+            rawData.forEach(v => {
+                console.log(`名前: ${v.channel.name} | Org: ${v.channel.org} | Suborg: ${v.channel.suborg}`);
+            });
+            console.groupEnd();
+            // ---------------------
+    
+            // 一旦、全ての "Hololive" 組織を表示するようにして挙動を見ます
+            const data = rawData.filter(v => v.channel && v.channel.org === "Hololive");
+            
+            // （以下、既存のカード生成処理...）
             listContainer.innerHTML = '';
-        
-            // 【修正ポイント】
-            // 1. channelオブジェクトが存在し、その組織(org)が厳密に "Hololive" であること
-            // 2. 念のため type が "stream" であることを確認
-            const data = rawData.filter(v => 
-                v.channel && 
-                // 1. 親組織が "Hololive" であること（これで全女性グループが対象になります）
-                v.channel.org === "Hololive" && 
-                // 2. サブ組織に "Stars" という文字が入っていないこと（これで男性陣を除外）
-                // ※ suborg が未定義の場合を考慮して optional chaining または空文字チェックを入れると安全です
-                !(v.channel.suborg && v.channel.suborg.includes("Stars"))
-            );
-        
-            if (data.length === 0) {
-                listContainer.innerHTML = '<p style="font-size: 10px; color: #666; text-align: center;">現在配信中の公式メンバーはいません</p>';
-                return;
-            }
-        
-            // 重複排除 (同じチャンネルで複数の枠がある場合、最新の1つだけを表示)
-            const uniqueData = Array.from(new Map(data.map(item => [item.channel.id, item])).values());
-    
-            uniqueData.forEach(video => {
-                const videoId = video.id;
-                // チャンネル名をきれいに成形
-                const channelName = video.channel.name.split(/[\[\(（【]/)[0].trim();
-                const title = video.title;
-    
-                const card = document.createElement('div');
-                card.className = 'live-member-card';
-                card.onclick = () => {
-                    if (!document.querySelector(`[data-video-id="${videoId}"]`)) {
-                        createVideoWindow(videoId, document.querySelectorAll('.video-window').length);
-                        updateStreamList();
-                        window.postMessage({ type: "START_POLLING_REQUEST", videoIds: [videoId] }, "*");
-                    }
-                };
-    
-                card.innerHTML = `
-                    <div style="display:flex; gap:8px; align-items:center;">
-                        <div style="position:relative; flex-shrink:0;">
-                            <img src="https://i.ytimg.com/vi/${videoId}/mqdefault.jpg" style="width: 70px; height: 40px; object-fit: cover; border-radius: 4px; border: 1px solid #444;">
-                            <div style="position:absolute; bottom:2px; right:2px; background:red; color:white; font-size:7px; padding:0 2px; border-radius:2px; font-weight:bold;">LIVE</div>
-                        </div>
-                        <div style="flex:1; overflow:hidden;">
-                            <div style="color: var(--accent); font-weight: bold; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${channelName}</div>
-                            <div style="font-size: 9px; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${title}</div>
-                        </div>
-                    </div>
-                `;
-                listContainer.appendChild(card);
+            data.forEach(video => {
+                /* 既存の表示ロジック */
             });
     
         } catch (error) {
-            console.error('Holodex API Error:', error);
-            listContainer.innerHTML = `<p style="font-size: 10px; color: #f44; text-align: center;">取得失敗 (${error.message})</p>`;
+            console.error('API Error:', error);
         }
     }
     
