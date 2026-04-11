@@ -118,12 +118,6 @@
             border: 1px solid #333; border-radius: 4px; padding: 10px;
             box-sizing: border-box; font-family: monospace; font-size: 11px;
         }
-
-        #stream-manager { margin-top: 20px; flex: 1; overflow-y: auto; }
-        .stream-item button {
-            background: #444;
-            transition: background 0.2s;
-        }
         .stream-item button:hover {
             background: #ff4444; /* ホバーで赤く */
         }
@@ -280,16 +274,12 @@
 <div id="sidebar" class="empty">
     <div class="sidebar-content">
         <h2 style="color: var(--accent); margin-bottom: 5px; font-size: 18px;">ホロストリーマー</h2>
-        <textarea id="url-list" placeholder="URLを改行して入力..."></textarea>
-        <button class="apply-btn" onclick="applyStreams()">キャンバスに展開</button>
         <div id="live-now-container" style="margin-top: 20px;">
-            <p style="font-size: 10px; color: var(--accent); letter-spacing: 1px; margin-bottom: 8px; border-left: 2px solid var(--accent); padding-left: 8px;">LIVE NOW (Hololive)</p>
+            <p style="font-size: 10px; color: var(--accent); letter-spacing: 1px; margin-bottom: 8px; border-left: 2px solid var(--accent); padding-left: 8px;">ホロライブ配信中</p>
             <div id="hololive-live-list"></div>
         </div>
-        <div id="stream-manager">
-            <p style="font-size: 10px; color: #666; border-bottom: 1px solid #333; padding-bottom: 5px; margin-top: 15px;">ACTIVE STREAMS</p>
-            <div id="stream-list"></div>
-        </div>
+        <textarea id="url-list" placeholder="URLを改行して入力..."></textarea>
+        <button class="apply-btn" onclick="applyStreams()">キャンバスに展開</button>
     </div>
 </div>
 
