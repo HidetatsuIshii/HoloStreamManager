@@ -764,21 +764,18 @@
     setInterval(updateHoloLiveStatus, 120000);
 
     function updateStreamList() {
-        const listContainer = document.getElementById('stream-list-container'); // ここがnull
-        if (!listContainer) {
-            console.warn("stream-list-container が見つかりません。");
-            return; 
-        }
+        // コンテナの存在チェックをより柔軟にする
         const list = document.getElementById('stream-list');
+        if (!list) return; // stream-list 自体がない場合は何もしない
+    
         list.innerHTML = '';
         const windows = document.querySelectorAll('.video-window');
         
         windows.forEach(win => {
             const id = win.dataset.videoId;
-            // チャンネル名やタイトルを取得できればベストですが、簡易的にIDで表示
             const item = document.createElement('div');
             item.className = 'stream-item';
-            item.style.padding = '10px'; // 少し大きく
+            item.style.padding = '10px';
             item.innerHTML = `
                 <span style="color:var(--accent)">ID: ${id.substring(0,8)}</span>
                 <button onclick="removeStream('${id}')" style="padding: 2px 8px; cursor:pointer;">削除</button>
@@ -786,12 +783,14 @@
             list.appendChild(item);
         });
     
-        // 配信がゼロになったらemptyに戻す
+        // サイドバーの empty クラス制御
         const sidebar = document.getElementById('sidebar');
-        if (windows.length === 0) {
-            sidebar.classList.add('empty');
-        } else {
-            sidebar.classList.remove('empty');
+        if (sidebar) {
+            if (windows.length === 0) {
+                sidebar.classList.add('empty');
+            } else {
+                sidebar.classList.remove('empty');
+            }
         }
     }
     
