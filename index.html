@@ -616,12 +616,30 @@
         // ダブルクリック：操作モード
         overlay.ondblclick = () => {
             win.classList.add('interacting');
+            
+            // 総合コントロールパネルを非表示にする
+            const mainPanel = document.getElementById('controls'); // パネルのIDに合わせて変更してください
+            if (mainPanel) {
+                mainPanel.style.display = 'none';
+            }
+            
+            // 視覚的に切り替わったことを示す（枠線を光らせるなど）
+            win.style.outline = "3px solid #ff0055";
         };
         
         // モード解除
         window.addEventListener('mousedown', (e) => {
             if (!win.contains(e.target)) {
-                win.classList.remove('interacting');
+                if (win.classList.contains('interacting')) {
+                    win.classList.remove('interacting');
+                    win.style.outline = "none";
+                    
+                    // パネルを再表示
+                    const mainPanel = document.getElementById('controls');
+                    if (mainPanel) {
+                        mainPanel.style.display = 'block';
+                    }
+                }
             }
         });
     
@@ -731,6 +749,11 @@
     setInterval(updateHoloLiveStatus, 120000);
 
     function updateStreamList() {
+        const listContainer = document.getElementById('stream-list-container'); // ここがnull
+        if (!listContainer) {
+            console.warn("stream-list-container が見つかりません。");
+            return; 
+        }
         const list = document.getElementById('stream-list');
         list.innerHTML = '';
         const windows = document.querySelectorAll('.video-window');
@@ -813,6 +836,8 @@
 
     // メッセージ受信イベント：YouTubeの状態監視 ＆ 拡張機能からのコメント処理
     window.addEventListener("message", (event) => {
+        console.log("Message received:", event.data);
+        
         // 1. YouTube Player API からのメッセージ処理 (Playerの状態変更など)
         try {
             if (typeof event.data === 'string') {
@@ -841,6 +866,7 @@
     
         // 2. 拡張機能からのコメント受信処理
         if (event.data && event.data.type === "FROM_EXTENSION") {
+            console.log("Comment data matched:", event.data.data);
             const data = event.data.data;
             if (!data || !data.videoId) return;
     
