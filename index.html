@@ -372,7 +372,6 @@
         const sidebar = document.getElementById('sidebar');
         const urlInput = document.getElementById('url-list').value;
         
-        // URLから動画IDを抽出
         const ids = urlInput.split(/\s+/).map(url => {
             const m = url.match(/(?:v=|\/)([0-9A-Za-z_-]{11})/);
             return m ? m[1] : null;
@@ -381,11 +380,22 @@
         if (ids.length > 0) {
             if (sidebar) sidebar.classList.remove('empty');
             
+            // --- 修正点：拡張機能へのリクエスト形式を統一 ---
+            // 1. ライブ配信用のポーリング開始
             window.postMessage({ 
                 type: "START_POLLING_REQUEST", 
                 videoIds: ids 
             }, "*");
-            console.log("Polling request sent for:", ids);
+    
+            // 2. アーカイブ配信の可能性があるため、シャドウタブ作成もリクエスト
+            ids.forEach(id => {
+                window.postMessage({ 
+                    type: "OPEN_SHADOW_TAB_REQUEST", 
+                    videoId: id 
+                }, "*");
+            });
+            
+            console.log("Commands sent to extension for:", ids);
         }
     
         ids.forEach((id, index) => {
@@ -813,14 +823,21 @@
 
     function removeStream(id) {
         const target = document.querySelector(`[data-video-id="${id}"]`);
-        if (target) target.remove();
-        
-        // sidebarをその場で取得するように変更
-        const sidebar = document.getElementById('sidebar');
-        if (sidebar && document.querySelectorAll('.video-window').length === 0) {
-            sidebar.classList.add('empty');
+        if (target) {
+            target.remove();
+            
+            // --- 追加：拡張機能に停止を依頼 ---
+            window.postMessage({
+                type: "REMOVE_STREAM_REQUEST",
+                videoId: id
+            }, "*");
+            
+            const sidebar = document.getElementById('sidebar');
+            if (sidebar && document.querySelectorAll('.video-window').length === 0) {
+                sidebar.classList.add('empty');
+            }
+            updateStreamList();
         }
-        updateStreamList();
     }
 
     // リサイズ追従用の変数
@@ -862,14 +879,19 @@
         try {
             if (typeof event.data === 'string') {
                 const msg = JSON.parse(event.data);
-                if (msg.event === 'infoDelivery' && msg.info && msg.info.playerState !== undefined) {
+                // YouTubeから再生情報が届いたとき
+                if (msg.event === 'infoDelivery' && msg.info) {
                     const frames = document.querySelectorAll('iframe.main-video');
                     frames.forEach(frame => {
                         if (frame.contentWindow === event.source) {
                             const win = frame.closest('.video-window');
-                            if (win) {
-                                const btn = win.querySelector('.play-pause-btn');
-                                if (btn) btn.innerText = (msg.info.playerState === 1) ? 'Ⅱ' : '▶';
+                            if (win && msg.info.currentTime !== undefined) {
+                                // --- 修正点：再生時間を拡張機能へ転送 ---
+                                window.postMessage({
+                                    type: "SYNC_TIME_REQUEST",
+                                    videoId: win.dataset.videoId,
+                                    time: msg.info.currentTime
+                                }, "*");
                             }
                         }
                     });
@@ -945,6 +967,23 @@
             renderComment();
         }
     });
+
+    // --- 追加：アーカイブ配信の再生同期処理（1秒おき） ---
+    setInterval(() => {
+        document.querySelectorAll('.video-window').forEach(win => {
+            const videoId = win.dataset.videoId;
+            const frame = win.querySelector('iframe.main-video');
+            
+            // YouTube Player API経由で現在の再生時間を取得
+            // iframeに postMessage を送って時間を要求するか、
+            // 簡易的には以下の方法で拡張機能に現在の（ツール上の）時間を伝えます
+            if (frame && frame.contentWindow) {
+                // 注意: YouTube APIから現在の時間を取得するには、
+                // 別途 Player オブジェクトを管理するか、messageイベントで受け取った時間を保持する必要があります。
+                // ここでは、拡張機能側に「現在の時間を同期せよ」という信号を送る準備をします。
+            }
+        });
+    }, 2000);
 </script>
 </body>
 </html>
