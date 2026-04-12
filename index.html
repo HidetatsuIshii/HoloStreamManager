@@ -539,7 +539,7 @@
                     音量 <input type="range" min="0" max="100" value="50" oninput="sendCommand('${id}', 'setVolume', [this.value])" style="width:70px">
                 </div>
                 <div class="config-row">
-                    <label><input type="checkbox" class="cfg-show" checked> 表示</label><br>
+                    <label><input type="checkbox" class="cfg-show" checked> コメント表示</label><br>
                     サイズ <input type="range" class="cfg-size" min="10" max="60" value="24" style="width:100%"><br>
                     速度 <input type="range" class="cfg-speed" min="1" max="20" value="10" style="width:100%"><br>
                     透明度 <input type="range" class="cfg-opacity" min="0" max="100" value="80" style="width:100%">
@@ -956,14 +956,7 @@
     });
 
     window.addEventListener("message", (event) => {
-        // === デバッグ用ログ出力（ここから） ===
-        if (event.data && event.data.type === "FROM_EXTENSION") {
-            console.log("%c[Extension -> HTML] メッセージを受信しました", "background: #222; color: #bada55; padding: 2px 5px;");
-            console.log("受信データ:", event.data.data);
-        }
-        // === デバッグ用ログ出力（ここまで） ===
-    
-        // 1. YouTube Player API からのメッセージ（再生・停止ボタンの同期）
+        // 1. YouTube Player API からのメッセージ（再生時間の同期）
         try {
             if (typeof event.data === 'string') {
                 const msg = JSON.parse(event.data);
@@ -973,7 +966,6 @@
                         if (frame.contentWindow === event.source) {
                             const win = frame.closest('.video-window');
                             if (win && msg.info.currentTime !== undefined) {
-                                // 再生時間を拡張機能へ転送
                                 window.postMessage({
                                     type: "SYNC_TIME_REQUEST",
                                     videoId: win.dataset.videoId,
@@ -985,95 +977,76 @@
                 }
             }
         } catch (e) {}
-    
-        // 2. 拡張機能からのコメント受信（アーカイブ対応・データ構造補正付き）
+
+        // 2. 拡張機能からのコメント受信（複数配信対応版）
         if (event.data && event.data.type === "FROM_EXTENSION") {
-            // --- 修正：データの二重構造を解消 ---
-            // background.jsの送り方によって data.data になっている場合と data になっている場合の両方に対応
-            const rawData = event.data.data;
-            const data = (rawData && rawData.data) ? rawData.data : rawData;
-    
-            if (!data || !data.videoId) {
-                console.warn("[Holo-Relay] 受信データの形式が不正です。videoIdが見つかりません:", data);
-                return;
+            // データ構造の正規化（ネストが深くても videoId を探す）
+            let commentData = event.data.data;
+            if (commentData && commentData.data) {
+                commentData = commentData.data;
             }
-    
-            // コメント描画を実行する内部関数
-            const renderComment = (retryCount = 0) => {
-                const targetId = data.videoId.trim();
-                const win = document.querySelector(`[data-video-id="${targetId}"]`);
+
+            if (!commentData || !commentData.videoId) return;
+
+            const targetId = commentData.videoId.trim();
+            // IDに紐づく特定のウィンドウを検索
+            const targetWin = document.querySelector(`.video-window[data-video-id="${targetId}"]`);
+            
+            if (!targetWin) return; // その配信ウィンドウが閉じられていれば無視
+
+            const canvas = targetWin.querySelector('.comment-canvas');
+            const showChecked = targetWin.querySelector('.cfg-show')?.checked;
+
+            if (showChecked && canvas) {
+                const el = document.createElement('div');
+                el.className = 'comment-text';
                 
-                if (!win) {
-                    if (retryCount < 10) {
-                        setTimeout(() => renderComment(retryCount + 1), 100);
+                // メンバー・スパチャ判定
+                if (commentData.type === 'member' || commentData.isMember) el.classList.add('is-member');
+                if (commentData.type === 'super-chat' || (commentData.amount && commentData.amount !== "")) el.classList.add('is-supa');
+
+                el.innerHTML = commentData.text || "";
+                
+                // そのウィンドウの設定値を取得
+                const size = parseInt(targetWin.querySelector('.cfg-size')?.value) || 24;
+                const speedValue = parseInt(targetWin.querySelector('.cfg-speed')?.value) || 10;
+                const opacityValue = parseInt(targetWin.querySelector('.cfg-opacity')?.value) || 80;
+                
+                const duration = (22 - speedValue) * 800;
+
+                // スタイル適用
+                el.style.fontSize = size + 'px';
+                el.style.opacity = opacityValue / 100;
+                el.style.top = (Math.floor(Math.random() * 85)) + '%'; // 重なりにくいよう散らす
+                el.style.position = 'absolute';
+                el.style.left = '100%';
+                el.style.whiteSpace = 'nowrap';
+                el.style.willChange = 'transform';
+
+                canvas.appendChild(el);
+
+                // アニメーション制御（個別のコンテキストで実行）
+                const startTime = performance.now();
+                const canvasWidth = canvas.offsetWidth;
+                const elWidth = el.offsetWidth || (size * el.innerText.length);
+                const distance = canvasWidth + elWidth;
+
+                function animate(time) {
+                    const elapsed = time - startTime;
+                    const progress = elapsed / duration;
+                    const currentPos = -(distance * progress);
+                    
+                    el.style.transform = `translateX(${currentPos}px)`;
+
+                    if (progress < 1) {
+                        // ウィンドウが削除されていないか確認
+                        if (el.parentNode) requestAnimationFrame(animate);
+                    } else {
+                        el.remove();
                     }
-                    return;
                 }
-    
-                const canvas = win.querySelector('.comment-canvas');
-                const showChecked = win.querySelector('.cfg-show')?.checked;
-    
-                if (showChecked && canvas) {
-                    const el = document.createElement('div');
-                    el.className = 'comment-text';
-                    
-                    const isMember = data.type === 'member' || data.isMember;
-                    const isSupa = data.type === 'super-chat' || (data.amount && data.amount !== "");
-    
-                    if (isMember) el.classList.add('is-member');
-                    if (isSupa) el.classList.add('is-supa');
-    
-                    el.innerHTML = data.text || "";
-                    
-                    // --- 設定値の取得 ---
-                    const size = parseInt(win.querySelector('.cfg-size')?.value) || 24;
-                    const speedValue = parseInt(win.querySelector('.cfg-speed')?.value) || 10;
-                    const opacityValue = parseInt(win.querySelector('.cfg-opacity')?.value) || 100;
-                    
-                    // 速度計算: duration（ミリ秒）
-                    const duration = (22 - speedValue) * 800;
-    
-                    // スタイル適用
-                    el.style.fontSize = size + 'px';
-                    el.style.opacity = opacityValue / 100;
-                    el.style.top = (Math.floor(Math.random() * 15) * 6) + '%';
-                    
-                    // 【重要】初期位置を右端の外側へ固定
-                    el.style.position = 'absolute';
-                    el.style.left = '100%';
-                    el.style.whiteSpace = 'nowrap';
-                    el.style.willChange = 'transform';
-    
-                    canvas.appendChild(el);
-    
-                    // アニメーション実行
-                    const startTime = performance.now();
-                    const canvasWidth = canvas.offsetWidth;
-                    const elWidth = el.offsetWidth || (size * (el.innerText?.length || 5));
-                    
-                    // 移動距離 = キャンバス幅 + 要素自身の幅
-                    const distance = canvasWidth + elWidth;
-    
-                    function animate(time) {
-                        const elapsed = time - startTime;
-                        const progress = elapsed / duration;
-                        
-                        // 右から左へ（translateXで100%から-elWidth相当分まで移動）
-                        // 100%位置から、(canvasWidth + elWidth)分だけ左にずらす
-                        const currentPos = - (distance * progress);
-                        el.style.transform = `translateX(${currentPos}px)`;
-                        
-                        if (progress < 1) {
-                            requestAnimationFrame(animate);
-                        } else {
-                            el.remove();
-                        }
-                    }
-                    requestAnimationFrame(animate);
-                }
-            };
-    
-            renderComment();
+                requestAnimationFrame(animate);
+            }
         }
     });
     
