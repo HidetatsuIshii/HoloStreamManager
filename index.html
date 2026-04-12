@@ -324,25 +324,28 @@
     function handleCanvasClick(e) {
         const sidebar = document.getElementById('sidebar');
         
-        // 1. サイドバーが表示されている場合
+        // 1. サイドバーが表示されている場合、クリックで閉じる
         if (sidebar.classList.contains('active')) {
-            // クリックされたのが「サイドバーの外（canvas）」であれば閉じる
             if (e.target.id === 'canvas') {
                 sidebar.classList.remove('active');
-                return; // 閉じる動作を優先
+                return; 
             }
         }
     
-        // --- 追加修正点 ---
-        // 2. 操作モード（interacting）のウィンドウがあるかチェック
-        // 一つでも操作モードのウィンドウがあれば、全画面切り替えをブロックする
-        const isAnyInteracting = document.querySelector('.video-window.interacting') !== null;
-        if (isAnyInteracting) {
-            return; // 何もしない（全画面切り替えを抑制）
+        // --- ここを修正 ---
+        // 2. 操作モード（interacting）のウィンドウが一つでもあるかチェック
+        // interactingクラスを持つ要素が画面内に存在する場合、全画面切り替えを完全にブロックします
+        const isInteracting = document.querySelector('.video-window.interacting') !== null;
+        
+        if (isInteracting) {
+            // 操作モードの時は、キャンバスをクリックしても全画面表示の切り替えを行わず、
+            // 「モード解除」のみを優先させるためにここで処理を終了します
+            console.log("[Holo-Relay] 操作モード中のため全画面切り替えを抑制しました");
+            return; 
         }
         // ------------------
     
-        // 3. サイドバーが閉まっていて、かつ操作モードでもない状態でのキャンバスクリック
+        // 3. 通常時（サイドバーが閉じていて、操作モードでもない）のキャンバスクリック
         if (e.target.id === 'canvas') {
             if (!document.fullscreenElement) {
                 document.documentElement.requestFullscreen().catch(err => {
