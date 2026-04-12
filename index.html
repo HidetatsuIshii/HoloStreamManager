@@ -385,7 +385,7 @@
 <script>
     console.log("System Initializing..."); // これがコンソールに出るか確認
     let windowZIndex = 100;
-    let backZIndex = -1;
+    let minZIndex = 100;
     const guard = document.getElementById('global-guard');
 
     function handleCanvasDblClick(e) {
@@ -554,14 +554,29 @@
 
     // --- 最背面に持っていく（常に現在の最背面より奥へ） ---
     function sendToBack(id) {
-        const win = document.querySelector(`[data-video-id="${id}"]`);
-        if (!win) return;
+        const targetWin = document.querySelector(`[data-video-id="${id}"]`);
+        if (!targetWin) return;
     
-        // backZIndex をさらに減らして適用することで、
-        // 既に背面(0など)にいる他のウィンドウよりも必ず奥に行かせます
-        win.style.zIndex = backZIndex--; 
+        // 1. 全てのウィンドウを取得
+        const allWindows = document.querySelectorAll('.video-window');
         
-        console.log(`[Holo-Relay] Window ${id} sent to back (zIndex: ${win.style.zIndex})`);
+        // 2. 他のすべてのウィンドウの zIndex を 1 増やす（相対的に対象を押し下げる）
+        allWindows.forEach(win => {
+            if (win !== targetWin) {
+                const currentZ = parseInt(win.style.zIndex) || 100;
+                win.style.zIndex = currentZ + 1;
+                
+                // 全体の最大値(windowZIndex)も更新しておく
+                if (currentZ + 1 >= windowZIndex) {
+                    windowZIndex = currentZ + 2;
+                }
+            }
+        });
+    
+        // 3. 対象のウィンドウを現在の最小値（最背面）に固定する
+        targetWin.style.zIndex = minZIndex;
+    
+        console.log(`[Holo-Relay] Window ${id} is now at the back (zIndex: ${targetWin.style.zIndex})`);
     }
     
     // --- 新規：最背面送りの制御 ---
