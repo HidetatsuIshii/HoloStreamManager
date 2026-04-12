@@ -323,29 +323,26 @@
 
     function handleCanvasClick(e) {
         const sidebar = document.getElementById('sidebar');
+        const canvas = document.getElementById('canvas');
         
-        // 1. サイドバーが開いている場合は閉じる処理を優先
+        // 1. サイドバーが表示されている場合（これは現状維持でOK）
         if (sidebar && sidebar.classList.contains('active')) {
             if (e.target.id === 'canvas') {
                 sidebar.classList.remove('active');
-                e.stopPropagation(); // 他の処理に回さない
-                return;
+                return; 
             }
         }
     
-        // 2. 操作モード（interacting）のウィンドウがあるかチェック
-        // querySelectorだけでなく、クリックされた直後にクラスが消えていないか確認するため
-        // 「今まさに解除されたばかりかどうか」を判定に含めるのが理想ですが、
-        // まずは単純に interacting が存在するかを厳密にチェックします。
+        // 2. 操作モード中、または「今モードを解除した直後」なら全画面をブロック
         const isAnyInteracting = document.querySelector('.video-window.interacting') !== null;
-        
-        if (isAnyInteracting) {
-            console.log("[Holo-Relay] 操作モード中を検知。全画面をブロックします。");
-            // ここで return するだけで、全画面処理（下のコード）には到達しません
+        const wasJustDeactivated = canvas.dataset.justDeactivated === "true";
+
+        if (isAnyInteracting || wasJustDeactivated) {
+            console.log("[Holo-Relay] 操作モードまたは解除直後のため、全画面切り替えを抑制しました");
             return; 
         }
     
-        // 3. 全画面切り替え（キャンバス本体がクリックされた時のみ）
+        // 3. 通常のキャンバスクリック（サイドバーも閉じ、操作モードでもない時）
         if (e.target.id === 'canvas') {
             if (!document.fullscreenElement) {
                 document.documentElement.requestFullscreen().catch(err => {
@@ -658,21 +655,29 @@
         };
         
         // モード解除
+        // モード解除（createVideoWindow 関数内）
         window.addEventListener('mousedown', (e) => {
-            if (!win.contains(e.target)) {
-                if (win.classList.contains('interacting')) {
+            if (win.classList.contains('interacting')) {
+                if (!win.contains(e.target)) {
+                    // 【重要】解除する瞬間に一時的なフラグを canvas に付与する
+                    const canvasEl = document.getElementById('canvas');
+                    canvasEl.dataset.justDeactivated = "true";
+                    
+                    // 0.3秒後にフラグを消す（クリックイベント完了を待つ）
+                    setTimeout(() => {
+                        delete canvasEl.dataset.justDeactivated;
+                    }, 300);
+
                     win.classList.remove('interacting');
                     win.style.outline = "none";
                     
-                    // このウィンドウ内にあるコントロールパネルを再表示
                     const mainPanel = win.querySelector('.individual-config');
                     if (mainPanel) {
-                        // display: block に戻す（CSSのhoverで制御されている場合は空文字にする）
                         mainPanel.style.display = ''; 
                     }
                 }
             }
-        });
+        }, true); // Captureフェーズで実行
     
         // 右クリック：最前面へ（ブラウザメニュー禁止）
         win.oncontextmenu = (e) => {
