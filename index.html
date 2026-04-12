@@ -267,6 +267,26 @@
             font-size: 14px;
             transition: background 0.2s;
         }
+
+        /* ボタンがアクティブな時の青枠スタイル */
+        .control-btn.active {
+            outline: 2px solid #00d4ff !important;
+            background-color: rgba(0, 212, 255, 0.2) !important;
+        }
+        
+        /* キャンパスめいっぱい表示用のクラス */
+        .video-window.full-canvas {
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            z-index: 1; /* 通常は1 */
+        }
+        
+        /* 最背面ボタンが押された時のクラス */
+        .video-window.send-to-back {
+            z-index: 0 !important;
+        }
         
         .close-btn:hover {
             background: #ff4444; /* ホバーで赤く光る */
@@ -506,6 +526,49 @@
         }
     }
 
+    // --- 新規：キャンパスめいっぱい表示の制御 ---
+    function toggleFullCanvas(id) {
+        const win = document.querySelector(`[data-video-id="${id}"]`);
+        const btn = document.getElementById(`full-canvas-btn-${id}`);
+        if (!win || !btn) return;
+    
+        const isFull = win.classList.toggle('full-canvas');
+        
+        if (isFull) {
+            btn.classList.add('active');
+            win.style.zIndex = windowZIndex++; // 一旦最前面へ
+        } else {
+            btn.classList.remove('active');
+        }
+    }
+    
+    // --- 新規：最背面送りの制御 ---
+    function toggleSendToBack(id) {
+        const win = document.querySelector(`[data-video-id="${id}"]`);
+        const btn = document.getElementById(`back-layer-btn-${id}`);
+        if (!win || !btn) return;
+    
+        const isBack = win.classList.toggle('send-to-back');
+        
+        if (isBack) {
+            btn.classList.add('active');
+            win.style.zIndex = 0; // z-indexを物理的に下げる
+        } else {
+            btn.classList.remove('active');
+            win.style.zIndex = windowZIndex++; // 通常のレイヤーに戻す
+        }
+    }
+    
+    // --- 共通：操作開始時に大画面を解除する関数 ---
+    function deactivateFullCanvas(win) {
+        if (win.classList.contains('full-canvas')) {
+            win.classList.remove('full-canvas');
+            const id = win.dataset.videoId;
+            const btn = document.getElementById(`full-canvas-btn-${id}`);
+            if (btn) btn.classList.remove('active');
+        }
+    }
+
     function createVideoWindow(id, index) {
         const win = document.createElement('div');
         win.className = 'video-window';
@@ -525,8 +588,9 @@
                 
                 <div class="config-row" style="margin-top: 15px;"> 
                     <div style="display:flex; gap:5px; margin-bottom:5px;">
-                        <button class="play-pause-btn" onclick="togglePlay('${id}')">Ⅱ</button>
                         <button id="hq-btn-${id}" class="quality-btn active" onclick="toggleHighQuality('${id}')" title="最高画質: ON">HQ</button>
+                        <button id="full-canvas-btn-${id}" class="quality-btn" onclick="toggleFullCanvas('${id}')" title="キャンパスめいっぱい">🔳</button>
+                        <button id="back-layer-btn-${id}" class="quality-btn" onclick="toggleSendToBack('${id}')" title="最背面へ送る">⏬</button>
                         <button class="quality-btn" onclick="toggleWindowSize('${id}')" title="大/小切替">▭</button>
                     </div>
                     音量 <input type="range" min="0" max="100" value="50" oninput="sendCommand('${id}', 'setVolume', [this.value])" style="width:70px">
@@ -591,6 +655,7 @@
         // --- リサイズ実行 ---
         win.onmousedown = (e) => {
             if (win.style.cursor.includes('resize')) {
+                deactivateFullCanvas(win);
                 isResizing = true;
                 dragGuard.style.display = 'block';
                 dragGuard.style.cursor = win.style.cursor;
@@ -636,7 +701,8 @@
         overlay.onmousedown = (e) => {
             if (win.style.cursor.includes('resize') || e.target.closest('.individual-config')) return;
             if (isResizing || win.classList.contains('interacting')) return;
-            
+
+            deactivateFullCanvas(win);
             win.classList.add('moving');
             win.style.zIndex = windowZIndex++;
             dragGuard.style.display = 'block';
