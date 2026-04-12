@@ -385,6 +385,7 @@
 <script>
     console.log("System Initializing..."); // これがコンソールに出るか確認
     let windowZIndex = 100;
+    let backZIndex = -1;
     const guard = document.getElementById('global-guard');
 
     function handleCanvasClick(e) {
@@ -541,13 +542,16 @@
         }
     }
 
-    // --- 【修正】最背面に持っていく（一回限りの実行） ---
+    // --- 最背面に持っていく（常に現在の最背面より奥へ） ---
     function sendToBack(id) {
         const win = document.querySelector(`[data-video-id="${id}"]`);
         if (!win) return;
     
-        // キャンバスめいっぱい状態を解除せず、z-index だけを 0 にする
-        win.style.zIndex = 0; 
+        // backZIndex をさらに減らして適用することで、
+        // 既に背面(0など)にいる他のウィンドウよりも必ず奥に行かせます
+        win.style.zIndex = backZIndex--; 
+        
+        console.log(`[Holo-Relay] Window ${id} sent to back (zIndex: ${win.style.zIndex})`);
     }
     
     // --- 新規：最背面送りの制御 ---
@@ -824,7 +828,7 @@
         // 右クリック：最前面へ（ブラウザメニュー禁止）
         win.oncontextmenu = (e) => {
             e.preventDefault(); 
-            win.style.zIndex = windowZIndex++;
+            win.style.zIndex = windowZIndex++; // これで背面から復帰できる
         };
         
         // iframeの読み込み完了時
