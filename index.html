@@ -275,7 +275,7 @@
         .config-row { margin-bottom: 8px; border-bottom: 1px solid #333; padding-bottom: 4px; }
         
         .comment-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100; overflow: hidden; }
-        .comment-text { position: absolute; white-space: nowrap; font-weight: 900; color: white; text-shadow: 2px 2px 2px #000; will-change: transform; }
+        .comment-text { position: absolute; white-space: nowrap; font-weight: 900; color: white; text-shadow: 2px 2px 2px #000; will-change: transform; opacity: 0.8; }
         .comment-text img { height: 1.2em; vertical-align: middle; } /* 絵文字サイズ調整 */
 
         button { cursor: pointer; border: none; font-weight: bold; border-radius: 3px; background: #444; color: #fff; padding: 2px 6px; }
@@ -461,6 +461,39 @@
         }
     }
 
+    // 画面サイズを切り替える関数
+    function toggleWindowSize(id) {
+        const win = document.querySelector(`[data-video-id="${id}"]`);
+        if (!win) return;
+    
+        const canvas = document.getElementById('canvas');
+        const sw = canvas.clientWidth;
+        const sh = canvas.clientHeight;
+    
+        // 現在の幅を取得（数値として比較するため parseInt）
+        const currentWidth = win.offsetWidth;
+    
+        // 「キャンバスいっぱい」の状態かどうかを判定
+        // 判定基準：現在の幅がキャンバス幅の 90% 以上なら「大」とみなす
+        const isLarge = currentWidth > sw * 0.9;
+    
+        if (isLarge) {
+            // 小画面にする（キャンバスの 1/8 サイズ）
+            win.style.width = (sw / 8) + 'px';
+            win.style.height = (sh / 8) + 'px';
+            // 中央付近に配置（任意）
+            win.style.left = (sw / 2 - sw / 16) + 'px';
+            win.style.top = (sh / 2 - sh / 16) + 'px';
+        } else {
+            // 大画面にする（キャンバスめいっぱい）
+            win.style.width = sw + 'px';
+            win.style.height = sh + 'px';
+            win.style.left = '0px';
+            win.style.top = '0px';
+            win.style.zIndex = windowZIndex++; // 最前面へ
+        }
+    }
+
     function createVideoWindow(id, index) {
         const win = document.createElement('div');
         win.className = 'video-window';
@@ -482,6 +515,7 @@
                     <div style="display:flex; gap:5px; margin-bottom:5px;">
                         <button class="play-pause-btn" onclick="togglePlay('${id}')">Ⅱ</button>
                         <button id="hq-btn-${id}" class="quality-btn active" onclick="toggleHighQuality('${id}')" title="最高画質: ON">HQ</button>
+                        <button class="quality-btn" onclick="toggleWindowSize('${id}')" title="大/小切替">▭</button>
                     </div>
                     音量 <input type="range" min="0" max="100" value="50" oninput="sendCommand('${id}', 'setVolume', [this.value])" style="width:70px">
                 </div>
