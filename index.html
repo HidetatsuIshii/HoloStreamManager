@@ -94,6 +94,27 @@
         #sidebar.empty { 
             transform: translateX(0); 
         }
+
+        #url-list {
+            width: 100%;
+            /* 1. 自動で潰されないように最小の高さを固定（1行分以上を確保） */
+            min-height: 120px; 
+            
+            /* 2. 手動でのリサイズ機能（縦方向のみ）を維持 */
+            resize: vertical; 
+            
+            /* 3. 他の要素に押し負けないように設定 */
+            flex-shrink: 0; 
+        
+            /* スタイル調整（既存のものがあれば適宜合わせてください） */
+            margin-top: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            color: white;
+            border: 1px solid var(--accent);
+            padding: 8px;
+            font-size: 12px;
+            box-sizing: border-box;
+        }
         
         /* --- サイドバーの中身をスクロール可能に修正 --- */
         .sidebar-content { 
@@ -210,6 +231,8 @@
             overflow: hidden;
             line-height: 1.3;
         }
+
+        
 
         /* 総合コントロールパネル */
         .individual-config {
