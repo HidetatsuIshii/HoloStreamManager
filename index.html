@@ -604,7 +604,7 @@
                         <button id="full-canvas-btn-${id}" class="quality-btn" onclick="toggleFullCanvas('${id}')" title="キャンパスめいっぱい">▭</button>
                         <button class="quality-btn" onclick="sendToBack('${id}')" title="最背面に移動">▼</button>
                     </div>
-                    音量 <input type="range" min="0" max="100" value="50" oninput="sendCommand('${id}', 'setVolume', [this.value])" style="width:70px">
+                    音量 <input type="range" class="cfg-volume" min="0" max="100" value="50" oninput="sendCommand('${id}', 'setVolume', [this.value])" style="width:70px">
                 </div>
                 <div class="config-row">
                     <label><input type="checkbox" class="cfg-show" checked> コメント表示</label><br>
@@ -829,6 +829,35 @@
         win.oncontextmenu = (e) => {
             e.preventDefault(); 
             win.style.zIndex = windowZIndex++; // これで背面から復帰できる
+        };
+
+        // --- 追加：ホイール操作による音量調節 ---
+        overlay.onwheel = (e) => {
+            // 操作モード（interacting）の時は標準の挙動を優先するためスキップ
+            if (win.classList.contains('interacting')) return;
+            
+            e.preventDefault(); // ブラウザ全体のスクロールを防止
+
+            // 現在の音量スライダー（input[type="range"]）を取得
+            const volumeInput = win.querySelector('input[type="range"]');
+            let currentVolume = parseInt(volumeInput.value);
+
+            // スクロール方向に応じて音量を増減（e.deltaYが正なら下スクロール＝音量ダウン）
+            // 1目盛りずつ細かく調整
+            const step = 2; 
+            if (e.deltaY > 0) {
+                currentVolume = Math.max(0, currentVolume - step);
+            } else {
+                currentVolume = Math.min(100, currentVolume + step);
+            }
+
+            // UIのスライダーを更新
+            volumeInput.value = currentVolume;
+            // 実際の動画音量を更新
+            sendCommand(id, 'setVolume', [currentVolume]);
+
+            // オプション：音量が変わったことをコンソールや一時的な表示で出すと親切です
+            console.log(`[Holo-Relay] Volume for ${id}: ${currentVolume}%`);
         };
         
         // iframeの読み込み完了時
