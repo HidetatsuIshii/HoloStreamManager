@@ -955,95 +955,63 @@
         lastWindowHeight = newHeight;
     });
 
+    // 2. 拡張機能からのコメント受信（複数配信対応版）
     window.addEventListener("message", (event) => {
-        // 1. YouTube Player API からのメッセージ（再生時間の同期）
-        try {
-            if (typeof event.data === 'string') {
-                const msg = JSON.parse(event.data);
-                if (msg.event === 'infoDelivery' && msg.info) {
-                    const frames = document.querySelectorAll('iframe.main-video');
-                    frames.forEach(frame => {
-                        if (frame.contentWindow === event.source) {
-                            const win = frame.closest('.video-window');
-                            if (win && msg.info.currentTime !== undefined) {
-                                window.postMessage({
-                                    type: "SYNC_TIME_REQUEST",
-                                    videoId: win.dataset.videoId,
-                                    time: msg.info.currentTime
-                                }, "*");
-                            }
-                        }
-                    });
-                }
-            }
-        } catch (e) {}
-
-        // 2. 拡張機能からのコメント受信（複数配信対応版）
         if (event.data && event.data.type === "FROM_EXTENSION") {
-            // データ構造の正規化（ネストが深くても videoId を探す）
-            let commentData = event.data.data;
-            if (commentData && commentData.data) {
-                commentData = commentData.data;
-            }
-
-            if (!commentData || !commentData.videoId) return;
-
-            const targetId = commentData.videoId.trim();
-            // IDに紐づく特定のウィンドウを検索
+            // データを取り出す（ネストの深さに対応）
+            let payload = event.data.data;
+            if (payload && payload.data) payload = payload.data;
+    
+            // videoId または id どちらでも受け取れるようにする
+            const targetId = (payload.videoId || payload.id || "").trim();
+            if (!targetId) return;
+    
+            // 特定の配信ウィンドウを検索
             const targetWin = document.querySelector(`.video-window[data-video-id="${targetId}"]`);
-            
-            if (!targetWin) return; // その配信ウィンドウが閉じられていれば無視
-
+            if (!targetWin) return;
+    
             const canvas = targetWin.querySelector('.comment-canvas');
             const showChecked = targetWin.querySelector('.cfg-show')?.checked;
-
+    
             if (showChecked && canvas) {
                 const el = document.createElement('div');
                 el.className = 'comment-text';
                 
-                // メンバー・スパチャ判定
-                if (commentData.type === 'member' || commentData.isMember) el.classList.add('is-member');
-                if (commentData.type === 'super-chat' || (commentData.amount && commentData.amount !== "")) el.classList.add('is-supa');
-
-                el.innerHTML = commentData.text || "";
+                // テキストの設定（HTMLエスケープを考慮する場合は innerText が安全）
+                el.innerHTML = payload.text || "";
                 
-                // そのウィンドウの設定値を取得
+                // メンバー・スパチャ等の装飾
+                if (payload.type === 'super-chat' || payload.amount) el.classList.add('is-supa');
+                if (payload.isMember) el.classList.add('is-member');
+    
+                // そのウィンドウ専用の設定値を取得
                 const size = parseInt(targetWin.querySelector('.cfg-size')?.value) || 24;
                 const speedValue = parseInt(targetWin.querySelector('.cfg-speed')?.value) || 10;
                 const opacityValue = parseInt(targetWin.querySelector('.cfg-opacity')?.value) || 80;
-                
                 const duration = (22 - speedValue) * 800;
-
-                // スタイル適用
+    
                 el.style.fontSize = size + 'px';
                 el.style.opacity = opacityValue / 100;
-                el.style.top = (Math.floor(Math.random() * 85)) + '%'; // 重なりにくいよう散らす
-                el.style.position = 'absolute';
-                el.style.left = '100%';
-                el.style.whiteSpace = 'nowrap';
-                el.style.willChange = 'transform';
-
+                el.style.top = (Math.floor(Math.random() * 80) + 5) + '%'; 
+                
                 canvas.appendChild(el);
-
-                // アニメーション制御（個別のコンテキストで実行）
+    
+                // アニメーション実行
                 const startTime = performance.now();
                 const canvasWidth = canvas.offsetWidth;
-                const elWidth = el.offsetWidth || (size * el.innerText.length);
+                const elWidth = el.offsetWidth || (size * (el.innerText.length || 1));
                 const distance = canvasWidth + elWidth;
-
+    
                 function animate(time) {
                     const elapsed = time - startTime;
                     const progress = elapsed / duration;
-                    const currentPos = -(distance * progress);
-                    
-                    el.style.transform = `translateX(${currentPos}px)`;
-
-                    if (progress < 1) {
-                        // ウィンドウが削除されていないか確認
-                        if (el.parentNode) requestAnimationFrame(animate);
-                    } else {
+                    if (progress >= 1) {
                         el.remove();
+                        return;
                     }
+                    const currentPos = -(distance * progress);
+                    el.style.transform = `translateX(${currentPos}px)`;
+                    if (el.parentNode) requestAnimationFrame(animate);
                 }
                 requestAnimationFrame(animate);
             }
