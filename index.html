@@ -324,28 +324,28 @@
     function handleCanvasClick(e) {
         const sidebar = document.getElementById('sidebar');
         
-        // 1. サイドバーが表示されている場合、クリックで閉じる
-        if (sidebar.classList.contains('active')) {
+        // 1. サイドバーが開いている場合は閉じる処理を優先
+        if (sidebar && sidebar.classList.contains('active')) {
             if (e.target.id === 'canvas') {
                 sidebar.classList.remove('active');
-                return; 
+                e.stopPropagation(); // 他の処理に回さない
+                return;
             }
         }
     
-        // --- ここを修正 ---
-        // 2. 操作モード（interacting）のウィンドウが一つでもあるかチェック
-        // interactingクラスを持つ要素が画面内に存在する場合、全画面切り替えを完全にブロックします
-        const isInteracting = document.querySelector('.video-window.interacting') !== null;
+        // 2. 操作モード（interacting）のウィンドウがあるかチェック
+        // querySelectorだけでなく、クリックされた直後にクラスが消えていないか確認するため
+        // 「今まさに解除されたばかりかどうか」を判定に含めるのが理想ですが、
+        // まずは単純に interacting が存在するかを厳密にチェックします。
+        const isAnyInteracting = document.querySelector('.video-window.interacting') !== null;
         
-        if (isInteracting) {
-            // 操作モードの時は、キャンバスをクリックしても全画面表示の切り替えを行わず、
-            // 「モード解除」のみを優先させるためにここで処理を終了します
-            console.log("[Holo-Relay] 操作モード中のため全画面切り替えを抑制しました");
+        if (isAnyInteracting) {
+            console.log("[Holo-Relay] 操作モード中を検知。全画面をブロックします。");
+            // ここで return するだけで、全画面処理（下のコード）には到達しません
             return; 
         }
-        // ------------------
     
-        // 3. 通常時（サイドバーが閉じていて、操作モードでもない）のキャンバスクリック
+        // 3. 全画面切り替え（キャンバス本体がクリックされた時のみ）
         if (e.target.id === 'canvas') {
             if (!document.fullscreenElement) {
                 document.documentElement.requestFullscreen().catch(err => {
