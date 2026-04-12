@@ -37,31 +37,32 @@
         /* ハンバーガーボタンのスタイル */
         #menu-trigger {
             position: fixed;
-            top: 15px;
-            left: 15px;
-            width: 40px;
+            top: 12px;   /* 少し上に詰める */
+            left: 12px;  /* 少し左に詰める */
+            width: 40px; /* クリックエリアは維持しつつ */
             height: 40px;
-            background: var(--panel-bg);
-            border: 1px solid #444;
-            border-radius: 4px;
+            background: transparent; /* 背景は基本透明 */
+            border: none;            /* 枠線も消す */
+            border-radius: 50%;      /* ホバー時に丸く光るように */
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             cursor: pointer;
-            z-index: 10001; 
-            transition: opacity 0.2s ease, background 0.2s;
+            z-index: 10001;
+            transition: background 0.2s ease;
         }
         
         #menu-trigger:hover {
-            background: #333;
+            background: rgba(255, 255, 255, 0.1); 
         }
         
         .bar {
-            width: 20px;
-            height: 2px;
-            background: var(--accent);
-            margin: 2px 0;
+            width: 18px;           /* 少し短く */
+            height: 2px;           /* 太さはそのまま、もしくは1.5px */
+            background: #e0e0e0;   /* 明るいグレーに変更（var(--accent)から変更） */
+            margin: 2px 0;         /* 線の間隔をGemini風に調整 */
+            border-radius: 10px;
         }
         
         /* サイドバーの初期状態（画面外へ） */
