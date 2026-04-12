@@ -980,8 +980,11 @@
     
                 el.style.fontSize = size + 'px';
                 el.style.opacity = opacityValue / 100;
+                el.style.top = (Math.floor(Math.random() * 85)) + '%'; // 重なりにくいよう散らす
+                el.style.position = 'absolute';
                 el.style.left = '100%';
-                el.style.top = (Math.floor(Math.random() * 80) + 5) + '%'; 
+                el.style.whiteSpace = 'nowrap';
+                el.style.willChange = 'transform';
                 
                 canvas.appendChild(el);
     
