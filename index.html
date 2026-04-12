@@ -157,7 +157,7 @@
         /* 操作用透明レイヤー */
         .drag-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            z-index: 10; cursor: move; background: transparent;
+            z-index: 10; background: transparent;
         }
         .video-window.interacting .drag-overlay { pointer-events: none; }
 
@@ -658,7 +658,7 @@
             if (win.classList.contains('interacting') || isResizing) return;
             
             const rect = win.getBoundingClientRect();
-            const hit = 25; 
+            const hit = 5; // ★ここを25から5に変更（境界線から5px以内のみ反応）
             let cursor = '';
             
             const isTop = (e.clientY - rect.top < hit);
@@ -676,7 +676,7 @@
                 win.style.cursor = cursor + '-resize';
                 currentHandle = cursor;
             } else {
-                win.style.cursor = 'default';
+                win.style.cursor = 'move'; 
                 currentHandle = '';
             }
         };
