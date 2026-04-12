@@ -312,8 +312,10 @@
             display: none;
             transition: all 0.15s ease;
         }
+
         
-        body.hide-ui {
+        body.hide-ui, 
+        body.hide-ui * {
             cursor: none !important;
         }
         
@@ -1061,22 +1063,33 @@
 
     // --- UI自動非表示ロジック ---
     let uiTimeout;
-    const UI_HIDE_TIME = 3000; // 3秒
+    const UI_HIDE_TIME = 3000;
     
     function resetUITimer() {
-        // UIを再表示
         document.body.classList.remove('hide-ui');
         
-        // 既存のタイマーをクリア
+        // UIが表示されている間は iframe を操作できるようにする
+        document.querySelectorAll('.video-window').forEach(win => {
+            win.style.pointerEvents = 'auto';
+        });
+        
         clearTimeout(uiTimeout);
         
-        // サイドバーが開いている間や、操作モード(interacting)の間はタイマーを動かさない
         const isSidebarActive = document.getElementById('sidebar').classList.contains('active');
         const isInteracting = document.querySelector('.video-window.interacting') !== null;
         
         if (!isSidebarActive && !isInteracting) {
             uiTimeout = setTimeout(() => {
                 document.body.classList.add('hide-ui');
+                
+                // UIが消えている間、iframeへのマウスイベントを遮断して
+                // bodyの cursor: none を確実に効かせる（クリックで再表示されるように）
+                document.querySelectorAll('.video-window').forEach(win => {
+                    // 操作モードでない時のみ、マウスイベントを一時的に無効化
+                    if(!win.classList.contains('interacting')) {
+                        win.style.pointerEvents = 'none';
+                    }
+                });
             }, UI_HIDE_TIME);
         }
     }
