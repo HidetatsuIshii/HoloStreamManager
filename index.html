@@ -411,39 +411,28 @@
     }
     
     function applyStreams() {
-        const sidebar = document.getElementById('sidebar');
         const urlInput = document.getElementById('url-list').value;
-        
         const ids = urlInput.split(/\s+/).map(url => {
             const m = url.match(/(?:v=|\/)([0-9A-Za-z_-]{11})/);
             return m ? m[1] : null;
         }).filter(id => id);
     
-        if (ids.length > 0) {
-            if (sidebar) sidebar.classList.remove('empty');
-            
-            // --- 修正点：拡張機能へのリクエスト形式を統一 ---
-            // 1. ライブ配信用のポーリング開始
-            window.postMessage({ 
-                type: "START_POLLING_REQUEST", 
-                videoIds: ids 
-            }, "*");
+        // まだ画面に存在しない新しいIDだけを抽出
+        const newIds = ids.filter(id => !document.querySelector(`[data-video-id="${id}"]`));
     
-            // 2. アーカイブ配信の可能性があるため、シャドウタブ作成もリクエスト
-            ids.forEach(id => {
-                window.postMessage({ 
-                    type: "OPEN_SHADOW_TAB_REQUEST", 
-                    videoId: id 
-                }, "*");
+        if (newIds.length > 0) {
+            // 新規分だけポーリング/タブ作成を依頼
+            window.postMessage({ type: "START_POLLING_REQUEST", videoIds: newIds }, "*");
+            newIds.forEach(id => {
+                window.postMessage({ type: "OPEN_SHADOW_TAB_REQUEST", videoId: id }, "*");
             });
-            
-            console.log("Commands sent to extension for:", ids);
-        }
     
-        ids.forEach((id, index) => {
-            if (document.querySelector(`[data-video-id="${id}"]`)) return;
-            createVideoWindow(id, index);
-        });
+            // 画面作成
+            newIds.forEach((id, index) => {
+                const currentIndex = document.querySelectorAll('.video-window').length;
+                createVideoWindow(id, currentIndex);
+            });
+        }
         updateStreamList();
     }
 
@@ -732,7 +721,6 @@
         };
         
         // モード解除
-        // モード解除（createVideoWindow 関数内）
         window.addEventListener('mousedown', (e) => {
             if (win.classList.contains('interacting')) {
                 if (!win.contains(e.target)) {
@@ -992,6 +980,7 @@
     
                 el.style.fontSize = size + 'px';
                 el.style.opacity = opacityValue / 100;
+                el.style.left = '100%';
                 el.style.top = (Math.floor(Math.random() * 80) + 5) + '%'; 
                 
                 canvas.appendChild(el);
