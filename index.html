@@ -533,13 +533,24 @@
         if (!win || !btn) return;
     
         const isFull = win.classList.toggle('full-canvas');
-        
         if (isFull) {
             btn.classList.add('active');
-            win.style.zIndex = windowZIndex++; // 一旦最前面へ
+            win.style.zIndex = windowZIndex++; 
         } else {
             btn.classList.remove('active');
         }
+    }
+
+    // --- 【修正】最背面に持っていく（一回限りの実行） ---
+    function sendToBack(id) {
+        const win = document.querySelector(`[data-video-id="${id}"]`);
+        if (!win) return;
+    
+        // 継続的なクラス付与はせず、その瞬間の zIndex を最小にする
+        win.style.zIndex = 0; 
+        
+        // もし「キャンパスめいっぱい」状態だったら、それも解除して戻すのが自然なため追加
+        deactivateFullCanvas(win);
     }
     
     // --- 新規：最背面送りの制御 ---
@@ -588,9 +599,8 @@
                 
                 <div class="config-row" style="margin-top: 15px;"> 
                     <div style="display:flex; gap:5px; margin-bottom:5px;">
-                        <button id="hq-btn-${id}" class="quality-btn active" onclick="toggleHighQuality('${id}')" title="最高画質: ON">HQ</button>
-                        <button id="full-canvas-btn-${id}" class="quality-btn" onclick="toggleFullCanvas('${id}')" title="キャンパスめいっぱい">🔳</button>
-                        <button id="back-layer-btn-${id}" class="quality-btn" onclick="toggleSendToBack('${id}')" title="最背面へ送る">⏬</button>
+                        <button id="full-canvas-btn-${id}" class="quality-btn" onclick="toggleFullCanvas('${id}')" title="キャンパスめいっぱい">▭</button>
+                        <button class="quality-btn" onclick="sendToBack('${id}')" title="最背面に移動">▼</button>
                         <button class="quality-btn" onclick="toggleWindowSize('${id}')" title="大/小切替">▭</button>
                     </div>
                     音量 <input type="range" min="0" max="100" value="50" oninput="sendCommand('${id}', 'setVolume', [this.value])" style="width:70px">
