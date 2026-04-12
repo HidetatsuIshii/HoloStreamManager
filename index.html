@@ -380,7 +380,7 @@
     <div class="bar"></div>
 </div>
 
-<div id="canvas" onclick="handleCanvasClick(event)"></div>
+<div id="canvas" onclick="closeSidebarOnly(event)" ondblclick="handleCanvasDblClick(event)"></div>
 
 <script>
     console.log("System Initializing..."); // これがコンソールに出るか確認
@@ -388,11 +388,12 @@
     let backZIndex = -1;
     const guard = document.getElementById('global-guard');
 
-    function handleCanvasClick(e) {
+    function handleCanvasDblClick(e) {
         const sidebar = document.getElementById('sidebar');
         const canvas = document.getElementById('canvas');
         
-        // 1. サイドバーが表示されている場合（これは現状維持でOK）
+        // 1. サイドバーが表示されている場合（これはシングルクリックで閉じたい場合は別途検討が必要ですが、
+        //    誤作動防止を優先し、ここではダブルクリック時のみの判定とします）
         if (sidebar && sidebar.classList.contains('active')) {
             if (e.target.id === 'canvas') {
                 sidebar.classList.remove('active');
@@ -403,21 +404,30 @@
         // 2. 操作モード中、または「今モードを解除した直後」なら全画面をブロック
         const isAnyInteracting = document.querySelector('.video-window.interacting') !== null;
         const wasJustDeactivated = canvas.dataset.justDeactivated === "true";
-
+    
         if (isAnyInteracting || wasJustDeactivated) {
             console.log("[Holo-Relay] 操作モードまたは解除直後のため、全画面切り替えを抑制しました");
             return; 
         }
     
-        // 3. 通常のキャンバスクリック（サイドバーも閉じ、操作モードでもない時）
+        // 3. 通常のキャンバスダブルクリック（全画面の切り替え）
         if (e.target.id === 'canvas') {
             if (!document.fullscreenElement) {
                 document.documentElement.requestFullscreen().catch(err => {
                     console.log("Fullscreen Error:", err);
                 });
             } else {
-                document.exitFullscreen();
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
             }
+        }
+    }
+    
+    function closeSidebarOnly(e) {
+        const sidebar = document.getElementById('sidebar');
+        if (sidebar && sidebar.classList.contains('active') && e.target.id === 'canvas') {
+            sidebar.classList.remove('active');
         }
     }
 
