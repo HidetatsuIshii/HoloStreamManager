@@ -546,11 +546,8 @@
         const win = document.querySelector(`[data-video-id="${id}"]`);
         if (!win) return;
     
-        // 継続的なクラス付与はせず、その瞬間の zIndex を最小にする
+        // キャンバスめいっぱい状態を解除せず、z-index だけを 0 にする
         win.style.zIndex = 0; 
-        
-        // もし「キャンパスめいっぱい」状態だったら、それも解除して戻すのが自然なため追加
-        deactivateFullCanvas(win);
     }
     
     // --- 新規：最背面送りの制御 ---
@@ -599,9 +596,9 @@
                 
                 <div class="config-row" style="margin-top: 15px;"> 
                     <div style="display:flex; gap:5px; margin-bottom:5px;">
+                        <button id="hq-btn-${id}" class="quality-btn active" onclick="toggleHighQuality('${id}')" title="最高画質: ON">HQ</button>
                         <button id="full-canvas-btn-${id}" class="quality-btn" onclick="toggleFullCanvas('${id}')" title="キャンパスめいっぱい">▭</button>
                         <button class="quality-btn" onclick="sendToBack('${id}')" title="最背面に移動">▼</button>
-                        <button class="quality-btn" onclick="toggleWindowSize('${id}')" title="大/小切替">▭</button>
                     </div>
                     音量 <input type="range" min="0" max="100" value="50" oninput="sendCommand('${id}', 'setVolume', [this.value])" style="width:70px">
                 </div>
