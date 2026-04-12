@@ -531,7 +531,7 @@
                     <label><input type="checkbox" class="cfg-show" checked> コメント表示</label><br>
                     サイズ <input type="range" class="cfg-size" min="10" max="60" value="24" style="width:100%"><br>
                     速度 <input type="range" class="cfg-speed" min="1" max="20" value="10" style="width:100%"><br>
-                    透明度 <input type="range" class="cfg-opacity" min="0" max="100" value="80" style="width:100%">
+                    透明度 <input type="range" class="cfg-opacity" min="0" max="100" value="60" style="width:100%">
                 </div>
             </div>
             <div class="video-content">
@@ -943,14 +943,38 @@
         lastWindowHeight = newHeight;
     });
 
-    // 2. 拡張機能からのコメント受信（複数配信対応版）
-    window.addEventListener("message", (event) => {
+   window.addEventListener("message", (event) => {
+        // 1. YouTube Player API からのメッセージ（再生時間の同期）
+        try {
+            if (typeof event.data === 'string') {
+                const msg = JSON.parse(event.data);
+                if (msg.event === 'infoDelivery' && msg.info) {
+                    const frames = document.querySelectorAll('iframe.main-video');
+                    frames.forEach(frame => {
+                        if (frame.contentWindow === event.source) {
+                            const win = frame.closest('.video-window');
+                            if (win && msg.info.currentTime !== undefined) {
+                                window.postMessage({
+                                    type: "SYNC_TIME_REQUEST",
+                                    videoId: win.dataset.videoId,
+                                    time: msg.info.currentTime
+                                }, "*");
+                            }
+                        }
+                    });
+                }
+            }
+        } catch (e) {
+            // JSONパースエラー等は無視
+        }
+    
+        // 2. 拡張機能からのコメント受信（複数配信・装飾対応版）
         if (event.data && event.data.type === "FROM_EXTENSION") {
             // データを取り出す（ネストの深さに対応）
             let payload = event.data.data;
             if (payload && payload.data) payload = payload.data;
     
-            // videoId または id どちらでも受け取れるようにする
+            // videoId を取得（トリムして確実に比較）
             const targetId = (payload.videoId || payload.id || "").trim();
             if (!targetId) return;
     
@@ -965,45 +989,59 @@
                 const el = document.createElement('div');
                 el.className = 'comment-text';
                 
-                // テキストの設定（HTMLエスケープを考慮する場合は innerText が安全）
+                // --- メンバー・スパチャ判定の統合 ---
+                // メンバー判定
+                if (payload.type === 'member' || payload.isMember) {
+                    el.classList.add('is-member');
+                }
+                // スーパーチャット判定
+                if (payload.type === 'super-chat' || (payload.amount && payload.amount !== "")) {
+                    el.classList.add('is-supa');
+                }
+    
+                // テキストの設定
                 el.innerHTML = payload.text || "";
                 
-                // メンバー・スパチャ等の装飾
-                if (payload.type === 'super-chat' || payload.amount) el.classList.add('is-supa');
-                if (payload.isMember) el.classList.add('is-member');
-    
                 // そのウィンドウ専用の設定値を取得
                 const size = parseInt(targetWin.querySelector('.cfg-size')?.value) || 24;
                 const speedValue = parseInt(targetWin.querySelector('.cfg-speed')?.value) || 10;
                 const opacityValue = parseInt(targetWin.querySelector('.cfg-opacity')?.value) || 80;
                 const duration = (22 - speedValue) * 800;
     
+                // スタイル適用
                 el.style.fontSize = size + 'px';
                 el.style.opacity = opacityValue / 100;
-                el.style.top = (Math.floor(Math.random() * 85)) + '%'; // 重なりにくいよう散らす
+                el.style.top = (Math.floor(Math.random() * 85)) + '%';
                 el.style.position = 'absolute';
                 el.style.left = '100%';
                 el.style.whiteSpace = 'nowrap';
                 el.style.willChange = 'transform';
                 
+                // DOMに追加
                 canvas.appendChild(el);
     
                 // アニメーション実行
                 const startTime = performance.now();
                 const canvasWidth = canvas.offsetWidth;
+                // 要素の幅を計算（offsetWidthが0の場合は文字数から概算）
                 const elWidth = el.offsetWidth || (size * (el.innerText.length || 1));
                 const distance = canvasWidth + elWidth;
     
                 function animate(time) {
                     const elapsed = time - startTime;
                     const progress = elapsed / duration;
+    
                     if (progress >= 1) {
                         el.remove();
                         return;
                     }
+    
                     const currentPos = -(distance * progress);
                     el.style.transform = `translateX(${currentPos}px)`;
-                    if (el.parentNode) requestAnimationFrame(animate);
+    
+                    if (el.parentNode) {
+                        requestAnimationFrame(animate);
+                    }
                 }
                 requestAnimationFrame(animate);
             }
